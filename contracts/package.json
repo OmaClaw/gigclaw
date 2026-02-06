@@ -7,8 +7,8 @@
     "test": "anchor test",
     "build": "anchor build",
     "deploy": "anchor deploy",
-    "lint:fix": "prettier */*.js "*/**/*{.js,.ts}" -w",
-    "lint": "prettier */*.js "*/**/*{.js,.ts}" --check"
+    "lint:fix": "prettier */*.js \"*/**/*{.js,.ts}\" -w",
+    "lint": "prettier */*.js \"*/**/*{.js,.ts}\" --check"
   },
   "dependencies": {
     "@coral-xyz/anchor": "^0.29.0",
