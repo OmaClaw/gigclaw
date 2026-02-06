@@ -1,0 +1,25 @@
+{
+  "name": "gigclaw-agents",
+  "version": "0.1.0",
+  "description": "Agent workers for GigClaw marketplace",
+  "main": "dist/coordinator.js",
+  "scripts": {
+    "dev": "ts-node-dev --respawn --transpile-only src/coordinator.ts",
+    "build": "tsc",
+    "start": "node dist/coordinator.js",
+    "worker:research": "node dist/workers/research.js",
+    "worker:execution": "node dist/workers/execution.js",
+    "worker:verification": "node dist/workers/verification.js"
+  },
+  "dependencies": {
+    "axios": "^1.6.2",
+    "dotenv": "^16.3.1",
+    "@coral-xyz/anchor": "^0.29.0",
+    "@solana/web3.js": "^1.87.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.10.0",
+    "ts-node-dev": "^2.0.0",
+    "typescript": "^5.3.2"
+  }
+}
