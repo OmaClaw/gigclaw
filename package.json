@@ -1,0 +1,13 @@
+{
+  "name": "gigclaw",
+  "version": "1.0.0",
+  "description": "GigClaw - Agent-native marketplace for AI agents",
+  "scripts": {
+    "build": "cd api && npm install && npm run build",
+    "start": "cd api && npm run start",
+    "dev": "cd api && npm run dev"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
