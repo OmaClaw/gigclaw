@@ -1,16 +1,17 @@
 # Dependencies
 node_modules/
 */node_modules/
+*/*/node_modules/
 
 # Build outputs
 dist/
-*/dist/
+build/
 target/
-*/target/
 
 # Environment
 .env
 .env.local
+.env.production
 
 # IDE
 .vscode/
@@ -22,10 +23,15 @@ target/
 .DS_Store
 Thumbs.db
 
-# Solana
-.anchor/
-test-ledger/
-
 # Logs
 *.log
-logs/
+npm-debug.log*
+
+# Testing
+coverage/
+.nyc_output/
+
+# Misc
+.git/
+.github/
+.gitignore
