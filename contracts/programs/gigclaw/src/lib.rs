@@ -160,13 +160,13 @@ pub mod gigclaw {
         reputation.completed_tasks += 1;
         reputation.total_earned += task.final_budget;
         reputation.success_rate = (reputation.completed_tasks as u64 * 100) 
-            / (reputation.completed_tasks + reputation.failed_tasks).max(1);
+            / (reputation.completed_tasks + reputation.failed_tasks).max(1) as u64;
 
         task.status = TaskStatus::Verified;
 
         emit!(PaymentReleased {
             task_id: task.task_id.clone(),
-            agent: ctx.accounts.agent.key(),
+            agent: task.assigned_agent.unwrap(),
             amount: task.final_budget,
         });
 
