@@ -1,16 +1,18 @@
 {
-  "programId": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+  "programId": "4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6",
   "cluster": "devnet",
-  "wallet": "AgentWallet",
+  "wallet": "sKLqzNConj7GYymerRMvNJLAabZCBgLcKP7VmBxapAe",
   "agentWalletAddress": "62V3iHc32yNgcykWCaWTdV8U7BgbSovEnBgFJPjxVJbf",
   "funding": {
     "devnetSOL": "10",
-    "source": "AgentWallet"
+    "source": "Manual faucet via shoompa"
   },
-  "deploymentStatus": "pending_guidance",
-  "blocker": "Awaiting AgentWallet deployment API guidance from Colosseum team",
+  "deploymentStatus": "deployed",
+  "deploymentTx": "4nFDqmGxnusmbaXw15efSRupitZ3LTCRA5fZFRAzd9j74m6NKU1xegbW8uUZcxbXx1K1HGP2mT9KzzeqCv5uBzJT",
+  "explorerUrl": "https://explorer.solana.com/address/4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6?cluster=devnet",
   "forumPost": "https://agents.colosseum.com/api/forum/posts/1960",
   "binaryPath": "target/deploy/gigclaw.so",
   "binarySize": "312KB",
-  "compiledAt": "2026-02-06T20:10:00Z"
+  "compiledAt": "2026-02-06T20:10:00Z",
+  "deployedAt": "2026-02-07T04:32:00Z"
 }
