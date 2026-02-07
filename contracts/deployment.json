@@ -1,0 +1,16 @@
+{
+  "programId": "Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS",
+  "cluster": "devnet",
+  "wallet": "AgentWallet",
+  "agentWalletAddress": "62V3iHc32yNgcykWCaWTdV8U7BgbSovEnBgFJPjxVJbf",
+  "funding": {
+    "devnetSOL": "10",
+    "source": "AgentWallet"
+  },
+  "deploymentStatus": "pending_guidance",
+  "blocker": "Awaiting AgentWallet deployment API guidance from Colosseum team",
+  "forumPost": "https://agents.colosseum.com/api/forum/posts/1960",
+  "binaryPath": "target/deploy/gigclaw.so",
+  "binarySize": "312KB",
+  "compiledAt": "2026-02-06T20:10:00Z"
+}
