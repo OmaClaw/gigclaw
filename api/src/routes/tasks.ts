@@ -1,8 +1,11 @@
 import { Router } from 'express';
 import { v4 as uuidv4 } from 'uuid';
+import { createTaskValidation, bidValidation, taskIdValidation } from '../middleware/validation';
+import { triggerWebhook } from '../routes/webhooks';
+import { AppError } from '../middleware/errorHandler';
 
 // In-memory store (replace with DB in production)
-const tasks = new Map();
+const tasks = new Map<string, any>();
 
 export const taskRouter = Router();
 
@@ -25,32 +28,45 @@ taskRouter.get('/:id', (req, res) => {
 });
 
 // Create new task
-taskRouter.post('/', (req, res) => {
-  const { title, description, budget, deadline, requiredSkills, posterId } = req.body;
-  
-  const taskId = uuidv4();
-  const task = {
-    id: taskId,
-    title,
-    description,
-    budget,
-    deadline,
-    requiredSkills,
-    posterId,
-    status: 'posted',
-    assignedAgent: null,
-    bids: [],
-    createdAt: Date.now(),
-    completedAt: null,
-  };
-  
-  tasks.set(taskId, task);
-  
-  res.status(201).json({ 
-    message: 'Task created',
-    taskId,
-    task 
-  });
+taskRouter.post('/', createTaskValidation, (req, res, next) => {
+  try {
+    const { title, description, budget, deadline, requiredSkills, posterId } = req.body;
+    
+    const taskId = uuidv4();
+    const task = {
+      id: taskId,
+      title,
+      description,
+      budget,
+      deadline,
+      requiredSkills,
+      posterId,
+      status: 'posted',
+      assignedAgent: null,
+      bids: [],
+      createdAt: Date.now(),
+      completedAt: null,
+    };
+    
+    tasks.set(taskId, task);
+    
+    // Trigger webhook
+    triggerWebhook('task.created', {
+      taskId,
+      title,
+      budget,
+      posterId,
+      requiredSkills
+    });
+    
+    res.status(201).json({ 
+      message: 'Task created',
+      taskId,
+      task 
+    });
+  } catch (error) {
+    next(error);
+  }
 });
 
 // Bid on task
