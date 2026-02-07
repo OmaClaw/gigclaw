@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response, NextFunction } from 'express';
 import { v4 as uuidv4 } from 'uuid';
 import { createTaskValidation, bidValidation, taskIdValidation } from '../middleware/validation';
 import { triggerWebhook } from '../routes/webhooks';
@@ -28,7 +28,7 @@ taskRouter.get('/:id', (req, res) => {
 });
 
 // Create new task
-taskRouter.post('/', createTaskValidation, (req, res, next) => {
+taskRouter.post('/', createTaskValidation, (req: Request, res: Response, next: NextFunction) => {
   try {
     const { title, description, budget, deadline, requiredSkills, posterId } = req.body;
     

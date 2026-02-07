@@ -1,4 +1,4 @@
-import { Router } from 'express';
+import { Router, Request, Response } from 'express';
 import { body } from 'express-validator';
 import { validate } from '../middleware/validation';
 
@@ -31,7 +31,7 @@ webhookRouter.post('/register', [
     'task.cancelled'
   ]).withMessage('Invalid event type'),
   validate
-], (req, res) => {
+], (req: Request, res: Response) => {
   const { url, events, agentId } = req.body;
   
   const subscription: WebhookSubscription = {
