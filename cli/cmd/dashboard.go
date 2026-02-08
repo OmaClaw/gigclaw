@@ -12,48 +12,68 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// Solana-inspired color palette
+const (
+	colorSolanaGreen = "#00FFA3"
+	colorSolanaPurple = "#9945FF"
+	colorDarkBg      = "#1a1a2e"
+	colorDarkerBg    = "#16213e"
+	colorText        = "#e0e0e0"
+	colorDimText     = "#666666"
+	colorWhite       = "#FFFFFF"
+)
+
 // Styles for the TUI
 var (
-	// Colors
 	titleStyle = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#00FFA3")). // Solana green
-		Background(lipgloss.Color("#1a1a2e")).
-		Padding(0, 1)
+		Foreground(lipgloss.Color(colorSolanaGreen)).
+		Background(lipgloss.Color(colorDarkBg)).
+		Padding(0, 2).
+		Border(lipgloss.RoundedBorder()).
+		BorderForeground(lipgloss.Color(colorSolanaGreen))
 
 	headerStyle = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#FFFFFF")).
-		Background(lipgloss.Color("#16213e")).
+		Foreground(lipgloss.Color(colorWhite)).
+		Background(lipgloss.Color(colorDarkerBg)).
 		Padding(0, 1)
 
 	selectedStyle = lipgloss.NewStyle().
 		Bold(true).
-		Foreground(lipgloss.Color("#000000")).
-		Background(lipgloss.Color("#00FFA3"))
+		Foreground(lipgloss.Color(colorDarkBg)).
+		Background(lipgloss.Color(colorSolanaGreen))
 
 	normalStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#e0e0e0"))
+		Foreground(lipgloss.Color(colorText))
 
 	dimStyle = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#666666"))
+		Foreground(lipgloss.Color(colorDimText))
 
-	// Box styles
 	boxStyle = lipgloss.NewStyle().
 		Border(lipgloss.RoundedBorder()).
-		BorderForeground(lipgloss.Color("#00FFA3")).
+		BorderForeground(lipgloss.Color(colorSolanaPurple)).
 		Padding(1, 2)
 
 	statusOnline = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#00FF00")).
+		Foreground(lipgloss.Color(colorSolanaGreen)).
 		Render("●")
 
-	statusOffline = lipgloss.NewStyle().
-		Foreground(lipgloss.Color("#FF0000")).
-		Render("●")
+	tabActive = lipgloss.NewStyle().
+		Bold(true).
+		Foreground(lipgloss.Color(colorDarkBg)).
+		Background(lipgloss.Color(colorSolanaGreen)).
+		Padding(0, 2)
+
+	tabInactive = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorText)).
+		Padding(0, 2)
+
+	helpStyle = lipgloss.NewStyle().
+		Foreground(lipgloss.Color(colorDimText)).
+		Italic(true)
 )
 
-// Model for the TUI
 type dashboardModel struct {
 	spinner    spinner.Model
 	taskTable  table.Model
@@ -68,11 +88,10 @@ type dashboardModel struct {
 	lastUpdate time.Time
 }
 
-// Tab constants
 const (
 	TabTasks = iota
-	TabBids
-	TabProfile
+	TabStats
+	TabHelp
 )
 
 type tasksMsg []Task
@@ -99,31 +118,39 @@ func (m dashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	switch msg := msg.(type) {
 	case tea.KeyMsg:
 		switch msg.String() {
-		case "q", "ctrl+c":
+		case "q", "ctrl+c", "esc":
 			return m, tea.Quit
-		case "tab":
+		case "tab", "right":
 			m.activeTab = (m.activeTab + 1) % len(m.tabs)
 			return m, nil
-		case "shift+tab":
+		case "shift+tab", "left":
 			m.activeTab = (m.activeTab - 1 + len(m.tabs)) % len(m.tabs)
 			return m, nil
-		case "r":
+		case "r", "f5":
 			m.loading = true
 			return m, fetchTasksCmd(m.client)
+		case "?":
+			m.activeTab = TabHelp
+			return m, nil
 		}
 
 	case tea.WindowSizeMsg:
 		m.width = msg.Width
 		m.height = msg.Height
-		// Adjust table columns based on width
+		
+		tableWidth := m.width - 10
+		if tableWidth < 60 {
+			tableWidth = 60
+		}
+		
 		columns := []table.Column{
 			{Title: "ID", Width: 10},
-			{Title: "Title", Width: m.width/3 - 10},
-			{Title: "Budget", Width: 12},
-			{Title: "Status", Width: 12},
+			{Title: "Title", Width: tableWidth/3},
+			{Title: "Budget", Width: 14},
+			{Title: "Status", Width: 14},
 		}
 		m.taskTable.SetColumns(columns)
-		m.taskTable.SetHeight(m.height - 10)
+		m.taskTable.SetHeight(m.height - 12)
 		return m, nil
 
 	case spinner.TickMsg:
@@ -136,20 +163,18 @@ func (m dashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		m.loading = false
 		m.lastUpdate = time.Now()
 		
-		// Update table rows
 		rows := []table.Row{}
 		for _, task := range m.tasks {
-			status := getStatusIcon(task.Status)
+			status := formatStatus(task.Status)
 			rows = append(rows, table.Row{
-				task.ID,
-				truncate(task.Title, m.width/3-15),
+				truncate(task.ID, 10),
+				truncate(task.Title, 40),
 				fmt.Sprintf("%.2f %s", task.Budget, task.Currency),
 				status,
 			})
 		}
 		m.taskTable.SetRows(rows)
 		
-		// Refresh after 30 seconds
 		return m, tea.Tick(time.Second*30, func(t time.Time) tea.Msg {
 			return fetchTasksCmd(m.client)()
 		})
@@ -165,75 +190,122 @@ func (m dashboardModel) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 	return m, cmd
 }
 
-func getStatusIcon(status string) string {
-	switch strings.ToLower(status) {
-	case "posted":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#00FF00")).Render("● Posted")
-	case "in_progress":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")).Render("◐ In Progress")
-	case "completed":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#00BFFF")).Render("◉ Completed")
-	case "verified":
-		return lipgloss.NewStyle().Foreground(lipgloss.Color("#808080")).Render("✓ Verified")
-	default:
-		return status
-	}
-}
 
 func (m dashboardModel) View() string {
 	if m.err != nil {
-		return fmt.Sprintf("\n  Error: %v\n\n  Press 'q' to quit.\n", m.err)
+		return fmt.Sprintf("\n  %s Error: %v\n\n  Press 'q' to quit.\n", 
+			lipgloss.NewStyle().Foreground(lipgloss.Color("#FF4444")).Render("✗"), m.err)
 	}
 
 	var b strings.Builder
 
-	// Title bar
 	b.WriteString(titleStyle.Render(" 🦀 GigClaw Dashboard "))
 	b.WriteString("\n\n")
 
-	// Status bar
 	status := statusOnline
 	if m.loading {
 		status = m.spinner.View()
 	}
-	b.WriteString(fmt.Sprintf("  %s API: Connected  |  Last update: %s  |  Press 'r' to refresh, 'q' to quit\n",
+	
+	statusLine := fmt.Sprintf("  %s API: %s  |  Last update: %s  |  %s tasks",
 		status,
-		m.lastUpdate.Format("15:04:05")))
-	b.WriteString("\n")
+		normalStyle.Render("Connected"),
+		m.lastUpdate.Format("15:04:05"),
+		normalStyle.Render(fmt.Sprintf("%d", len(m.tasks))),
+	)
+	b.WriteString(statusLine)
+	b.WriteString("\n\n")
 
-	// Tabs
-	tabs := []string{"Tasks", "Bids", "Profile"}
-	for i, tab := range tabs {
+	for i, tab := range m.tabs {
 		if i == m.activeTab {
-			b.WriteString(selectedStyle.Render(" "+tab+" "))
+			b.WriteString(tabActive.Render(" " + tab + " "))
 		} else {
-			b.WriteString(normalStyle.Render(" "+tab+" "))
+			b.WriteString(tabInactive.Render(" " + tab + " "))
 		}
 		b.WriteString(" ")
 	}
+	b.WriteString("\n")
+	b.WriteString(strings.Repeat("─", m.width-4))
 	b.WriteString("\n\n")
 
-	// Content based on active tab
 	switch m.activeTab {
 	case TabTasks:
 		if m.loading && len(m.tasks) == 0 {
 			b.WriteString(fmt.Sprintf("\n  %s Loading tasks...\n", m.spinner.View()))
 		} else if len(m.tasks) == 0 {
-			b.WriteString("\n  No tasks found.\n")
-			b.WriteString(dimStyle.Render("\n  Use 'gigclaw task post' to create your first task.\n"))
+			b.WriteString("\n  " + dimStyle.Render("No tasks found.\n"))
+			b.WriteString("\n  Create your first task:\n")
+			b.WriteString("  " + normalStyle.Render("gigclaw task post --title 'My Task' --budget 50"))
 		} else {
 			b.WriteString(boxStyle.Render(m.taskTable.View()))
 		}
-	case TabBids:
-		b.WriteString("\n  Bids feature coming soon...\n")
-	case TabProfile:
-		b.WriteString("\n  Profile feature coming soon...\n")
+		
+	case TabStats:
+		b.WriteString(m.renderStats())
+		
+	case TabHelp:
+		b.WriteString(m.renderHelp())
 	}
 
-	// Help footer
 	b.WriteString("\n\n")
-	b.WriteString(dimStyle.Render("  Tab: Switch tabs  |  ↑/↓: Navigate  |  r: Refresh  |  q: Quit"))
+	b.WriteString(helpStyle.Render("  tab/←→: Switch tabs  |  ↑/↓: Navigate  |  r: Refresh  |  q: Quit  |  ?: Help"))
 
+	return b.String()
+}
+
+func (m dashboardModel) renderStats() string {
+	var b strings.Builder
+	
+	posted := 0
+	inProgress := 0
+	completed := 0
+	verified := 0
+	
+	for _, task := range m.tasks {
+		switch strings.ToLower(task.Status) {
+		case "posted":
+			posted++
+		case "in_progress", "inprogress":
+			inProgress++
+		case "completed":
+			completed++
+		case "verified":
+			verified++
+		}
+	}
+	
+	b.WriteString("\n  📊 Task Statistics\n\n")
+	b.WriteString(fmt.Sprintf("  %s Posted:      %d\n", 
+		lipgloss.NewStyle().Foreground(lipgloss.Color(colorSolanaGreen)).Render("●"), posted))
+	b.WriteString(fmt.Sprintf("  %s In Progress: %d\n", 
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#FFA500")).Render("◐"), inProgress))
+	b.WriteString(fmt.Sprintf("  %s Completed:   %d\n", 
+		lipgloss.NewStyle().Foreground(lipgloss.Color("#00BFFF")).Render("◉"), completed))
+	b.WriteString(fmt.Sprintf("  %s Verified:    %d\n", 
+		lipgloss.NewStyle().Foreground(lipgloss.Color(colorDimText)).Render("✓"), verified))
+	b.WriteString("\n")
+	b.WriteString(fmt.Sprintf("  Total: %d tasks\n", len(m.tasks)))
+	
+	return b.String()
+}
+
+func (m dashboardModel) renderHelp() string {
+	var b strings.Builder
+	
+	b.WriteString("\n  📖 Keyboard Shortcuts\n\n")
+	b.WriteString("  Tab / →     Next tab\n")
+	b.WriteString("  Shift+Tab / ←  Previous tab\n")
+	b.WriteString("  ↑ / ↓       Navigate list\n")
+	b.WriteString("  r / F5      Refresh data\n")
+	b.WriteString("  ?           Show this help\n")
+	b.WriteString("  q / Esc     Quit dashboard\n")
+	b.WriteString("\n")
+	b.WriteString("  📚 CLI Commands\n\n")
+	b.WriteString("  gigclaw task list       View all tasks\n")
+	b.WriteString("  gigclaw task post       Create a new task\n")
+	b.WriteString("  gigclaw task bid        Bid on a task\n")
+	b.WriteString("  gigclaw doctor          Run diagnostics\n")
+	
 	return b.String()
 }
 
@@ -247,9 +319,10 @@ Press 'r' to refresh data, 'q' to quit.
 
 Features:
 - Real-time task feed
-- Live status updates
+- Task statistics
 - Keyboard navigation
-- Beautiful TUI interface`,
+- Beautiful TUI interface
+- Auto-refresh every 30 seconds`,
 	RunE: runDashboard,
 }
 
@@ -259,22 +332,19 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 		return err
 	}
 
-	// Test connection first
 	if _, err := client.Health(); err != nil {
 		return fmt.Errorf("cannot connect to API: %w", err)
 	}
 
-	// Configure spinner
 	s := spinner.New()
 	s.Spinner = spinner.Dot
-	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color("#00FFA3"))
+	s.Style = lipgloss.NewStyle().Foreground(lipgloss.Color(colorSolanaGreen))
 
-	// Configure table
 	columns := []table.Column{
 		{Title: "ID", Width: 10},
 		{Title: "Title", Width: 30},
-		{Title: "Budget", Width: 12},
-		{Title: "Status", Width: 12},
+		{Title: "Budget", Width: 14},
+		{Title: "Status", Width: 14},
 	}
 
 	t := table.New(
@@ -283,22 +353,17 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 		table.WithHeight(20),
 	)
 
-	// Style the table
 	t.SetStyles(table.Styles{
-		Header: headerStyle,
+		Header:   headerStyle,
 		Selected: selectedStyle,
-		Cell: normalStyle,
+		Cell:     normalStyle,
 	})
 
-	// Clear screen for TUI
-	fmt.Print("\033[H\033[2J")
-
-	// Run the TUI
 	m := dashboardModel{
 		spinner:   s,
 		taskTable: t,
 		loading:   true,
-		tabs:      []string{"Tasks", "Bids", "Profile"},
+		tabs:      []string{"Tasks", "Stats", "Help"},
 		client:    client,
 	}
 
@@ -309,6 +374,7 @@ func runDashboard(cmd *cobra.Command, args []string) error {
 
 	return nil
 }
+
 
 func init() {
 	rootCmd.AddCommand(dashboardCmd)

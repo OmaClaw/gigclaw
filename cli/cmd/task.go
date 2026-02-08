@@ -76,22 +76,6 @@ func init() {
 	taskPostCmd.MarkFlagRequired("budget")
 }
 
-func formatStatus(status string) string {
-	switch strings.ToLower(status) {
-	case "posted":
-		return colorStatusPosted.Sprintf("● %s", status)
-	case "in_progress", "inprogress":
-		return colorStatusProgress.Sprintf("◐ %s", status)
-	case "completed":
-		return colorStatusCompleted.Sprintf("◉ %s", status)
-	case "verified":
-		return colorStatusVerified.Sprintf("✓ %s", status)
-	case "cancelled":
-		return colorError.Sprintf("✗ %s", status)
-	default:
-		return status
-	}
-}
 
 func runTaskList(cmd *cobra.Command, args []string) error {
 	// Show loading spinner
@@ -244,9 +228,3 @@ func runTaskPost(cmd *cobra.Command, args []string) error {
 	return nil
 }
 
-func truncate(s string, maxLen int) string {
-	if len(s) <= maxLen {
-		return s
-	}
-	return s[:maxLen-3] + colorDim.Sprint("...")
-}
