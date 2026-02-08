@@ -98,6 +98,36 @@ if command -v gigclaw &> /dev/null; then
     echo
     echo -e "${GREEN}✅ GigClaw CLI installed successfully!${NC}"
     echo
+    
+    # Setup shell completions
+    SHELL_NAME=$(basename "$SHELL")
+    echo "Setting up shell completions for $SHELL_NAME..."
+    
+    case "$SHELL_NAME" in
+        bash)
+            COMPLETION_DIR="${BASH_COMPLETION_USER_DIR:-${XDG_DATA_HOME:-$HOME/.local/share}/bash-completion}/completions"
+            mkdir -p "$COMPLETION_DIR"
+            gigclaw completion bash > "$COMPLETION_DIR/gigclaw"
+            echo -e "${GREEN}✅ Bash completions installed${NC}"
+            ;;
+        zsh)
+            if [ -d "$HOME/.oh-my-zsh" ]; then
+                mkdir -p "$HOME/.oh-my-zsh/completions"
+                gigclaw completion zsh > "$HOME/.oh-my-zsh/completions/_gigclaw"
+            else
+                mkdir -p "${ZSH_CUSTOM:-$HOME/.zsh/custom}/completions"
+                gigclaw completion zsh > "${ZSH_CUSTOM:-$HOME/.zsh/custom}/completions/_gigclaw"
+            fi
+            echo -e "${GREEN}✅ Zsh completions installed${NC}"
+            ;;
+        fish)
+            mkdir -p "$HOME/.config/fish/completions"
+            gigclaw completion fish > "$HOME/.config/fish/completions/gigclaw.fish"
+            echo -e "${GREEN}✅ Fish completions installed${NC}"
+            ;;
+    esac
+    
+    echo
     echo "Get started:"
     echo "  gigclaw init      # Configure your API credentials"
     echo "  gigclaw health    # Check API status"
