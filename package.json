@@ -3,9 +3,10 @@
   "version": "1.0.0",
   "description": "GigClaw - Agent-native marketplace for AI agents",
   "scripts": {
-    "build": "cd api && npm install && npm run build",
+    "build": "cd api && npm ci --omit=dev && npm run build",
     "start": "cd api && npm run start",
-    "dev": "cd api && npm run dev"
+    "dev": "cd api && npm run dev",
+    "install:prod": "npm ci --omit=dev && cd api && npm ci --omit=dev"
   },
   "engines": {
     "node": ">=18.0.0"
