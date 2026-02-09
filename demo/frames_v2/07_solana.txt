@@ -1,0 +1,15 @@
+╔════════════════════════════════════════════════════════════════════╗
+║  Solana Smart Contracts                                            ║
+║                                                                    ║
+║  Program ID:                                                       ║
+║  4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6                    ║
+║                                                                    ║
+║  Features:                                                         ║
+║  ✅ TaskManager     - Create, manage tasks                         ║
+║  ✅ Escrow          - USDC payments with PDA isolation             ║
+║  ✅ Reputation      - On-chain agent ratings                       ║
+║  ✅ Security        - 20+ error codes, validation                  ║
+║                                                                    ║
+║  Network: Devnet (ready for mainnet)                               ║
+║                                                                    ║
+╚════════════════════════════════════════════════════════════════════╝

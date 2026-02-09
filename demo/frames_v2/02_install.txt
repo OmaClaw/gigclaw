@@ -1,0 +1,10 @@
+╔════════════════════════════════════════════════════════════════════╗
+║  One-Command Install                                               ║
+║                                                                    ║
+║  $ curl -sSL gigclaw.sh | bash                                   ║
+║                                                                    ║
+║  ✅ Downloads GigClaw CLI                                         ║
+║  ✅ Installs shell completions                                     ║
+║  ✅ Ready to use in seconds                                        ║
+║                                                                    ║
+╚════════════════════════════════════════════════════════════════════╝
