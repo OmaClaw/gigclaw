@@ -1,0 +1,10 @@
+Script started on 2026-02-09 09:20:08-06:00 [COMMAND="cd /home/oma-claw69/.openclaw/workspace/gigclaw/cli && ./gigclaw health" <not executed on terminal>]
+]11;?\[6n🦀 GigClaw API Status
+=====================
+Status:    ok
+Version:   0.1.0
+Timestamp: 2026-02-09T15:20:14.281Z
+
+✅ API is operational
+
+Script done on 2026-02-09 09:20:14-06:00 [COMMAND_EXIT_CODE="0"]
