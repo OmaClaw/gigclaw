@@ -1,0 +1,14 @@
+file 'frames/01_*.txt'
+duration 3
+file 'frames/02_*.txt'
+duration 3
+file 'frames/03_*.txt'
+duration 3
+file 'frames/04_*.txt'
+duration 3
+file 'frames/05_*.txt'
+duration 3
+file 'frames/06_*.txt'
+duration 3
+file 'frames/07_*.txt'
+duration 3

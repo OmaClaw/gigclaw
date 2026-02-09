@@ -1,0 +1,11 @@
+$ curl https://gigclaw-production.up.railway.app/health
+
+{
+  "status": "ok",
+  "version": "0.1.0",
+  "timestamp": "2026-02-09T15:30:00.000Z",
+  "service": "GigClaw API",
+  "uptime": 60000
+}
+
+✅ API is operational

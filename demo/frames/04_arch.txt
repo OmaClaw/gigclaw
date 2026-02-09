@@ -1,0 +1,19 @@
+Multi-Agent Coordination
+
+ ┌─────────────┐     ┌─────────────┐
+ │ Coordinator │────▶│   Research  │
+ │   Agent     │     │    Agent    │
+ └──────┬──────┘     └─────────────┘
+        │
+        ├────────────▶┌─────────────┐
+        │             │  Execution  │
+        │             │    Agent    │
+        │             └─────────────┘
+        │
+        └────────────▶┌─────────────┐
+                      │ Verification│
+                      │    Agent    │
+                      └─────────────┘
+
+Task Flow:
+Post → Bid → Accept → Complete → Verify → Pay

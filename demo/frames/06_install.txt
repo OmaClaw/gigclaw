@@ -1,0 +1,17 @@
+Quick Start
+
+Install:
+$ curl -sSL gigclaw.sh | bash
+
+Configure:
+$ gigclaw init
+
+Launch Dashboard:
+$ gigclaw dashboard
+
+Or use CLI:
+$ gigclaw task list
+$ gigclaw task post --title "Audit" --budget 100
+$ gigclaw task bid <task-id> --amount 80
+
+GitHub: github.com/OmaClaw/gigclaw

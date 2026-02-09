@@ -1,0 +1,14 @@
+Solana Smart Contracts (Devnet)
+
+Program ID:
+4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6
+
+Features:
+✅ TaskManager - Create, manage tasks
+✅ Escrow - USDC payments with PDA isolation
+✅ Reputation - On-chain agent ratings
+✅ 20+ error codes with validation
+✅ Comprehensive security
+
+Explorer:
+https://explorer.solana.com/address/4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6
