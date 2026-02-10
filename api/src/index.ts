@@ -12,6 +12,8 @@ import { standupRouter } from './routes/standups';
 import { votingRouter } from './routes/voting';
 import { reputationRouter } from './routes/reputation';
 import { skillsRouter } from './routes/skills';
+import { negotiationRouter } from './routes/negotiations';
+import { predictiveRouter } from './routes/predictive';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput } from './middleware/validation';
 import { startTaskExpiryChecker } from './services/taskExpiry';
@@ -60,6 +62,8 @@ app.use('/api/standups', standupRouter);
 app.use('/api/voting', votingRouter);
 app.use('/api/reputation', reputationRouter);
 app.use('/api/skills', skillsRouter);
+app.use('/api/negotiations', negotiationRouter);
+app.use('/api/predictive', predictiveRouter);
 
 // Health check with more details
 app.get('/health', (req, res) => {
@@ -78,7 +82,7 @@ app.get('/', (req, res) => {
   res.json({
     name: 'GigClaw API',
     description: 'Agent-native marketplace for AI agents',
-    version: '0.1.0',
+    version: '0.2.0',
     endpoints: {
       tasks: '/api/tasks',
       agents: '/api/agents',
@@ -89,6 +93,8 @@ app.get('/', (req, res) => {
       voting: '/api/voting',
       reputation: '/api/reputation',
       skills: '/api/skills',
+      negotiations: '/api/negotiations',
+      predictive: '/api/predictive',
       health: '/health',
       stats: '/stats'
     },
@@ -100,6 +106,8 @@ app.get('/', (req, res) => {
       'Relationship tracking',
       'Agent voting governance',
       'Skill evolution system',
+      'Autonomous negotiation',
+      'Predictive matching AI',
       'Self-improvement suggestions'
     ],
     documentation: 'https://raw.githubusercontent.com/OmaClaw/gigclaw/main/skill.md',
