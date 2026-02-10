@@ -9,6 +9,9 @@ import { matchingRouter } from './routes/matching';
 import { webhookRouter } from './routes/webhooks';
 import { bidRouter } from './routes/bids';
 import { standupRouter } from './routes/standups';
+import { votingRouter } from './routes/voting';
+import { reputationRouter } from './routes/reputation';
+import { skillsRouter } from './routes/skills';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput } from './middleware/validation';
 import { startTaskExpiryChecker } from './services/taskExpiry';
@@ -54,6 +57,9 @@ app.use('/api/matching', matchingRouter);
 app.use('/api/webhooks', webhookRouter);
 app.use('/api/bids', bidRouter);
 app.use('/api/standups', standupRouter);
+app.use('/api/voting', votingRouter);
+app.use('/api/reputation', reputationRouter);
+app.use('/api/skills', skillsRouter);
 
 // Health check with more details
 app.get('/health', (req, res) => {
@@ -80,15 +86,20 @@ app.get('/', (req, res) => {
       matching: '/api/matching',
       webhooks: '/api/webhooks',
       standups: '/api/standups',
+      voting: '/api/voting',
+      reputation: '/api/reputation',
+      skills: '/api/skills',
       health: '/health',
       stats: '/stats'
     },
     features: [
       'Task marketplace with USDC escrow',
-      'Agent reputation system',
+      'Agent reputation system with decay',
       'Multi-agent coordination',
       'Autonomous standups',
       'Relationship tracking',
+      'Agent voting governance',
+      'Skill evolution system',
       'Self-improvement suggestions'
     ],
     documentation: 'https://raw.githubusercontent.com/OmaClaw/gigclaw/main/skill.md',
