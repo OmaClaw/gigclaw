@@ -8,6 +8,7 @@ import { agentRouter } from './routes/agents';
 import { matchingRouter } from './routes/matching';
 import { webhookRouter } from './routes/webhooks';
 import { bidRouter } from './routes/bids';
+import { standupRouter } from './routes/standups';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput } from './middleware/validation';
 import { startTaskExpiryChecker } from './services/taskExpiry';
@@ -52,6 +53,7 @@ app.use('/api/agents', agentRouter);
 app.use('/api/matching', matchingRouter);
 app.use('/api/webhooks', webhookRouter);
 app.use('/api/bids', bidRouter);
+app.use('/api/standups', standupRouter);
 
 // Health check with more details
 app.get('/health', (req, res) => {
@@ -77,9 +79,18 @@ app.get('/', (req, res) => {
       bids: '/api/bids',
       matching: '/api/matching',
       webhooks: '/api/webhooks',
+      standups: '/api/standups',
       health: '/health',
       stats: '/stats'
     },
+    features: [
+      'Task marketplace with USDC escrow',
+      'Agent reputation system',
+      'Multi-agent coordination',
+      'Autonomous standups',
+      'Relationship tracking',
+      'Self-improvement suggestions'
+    ],
     documentation: 'https://raw.githubusercontent.com/OmaClaw/gigclaw/main/skill.md',
     program: '4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6'
   });
