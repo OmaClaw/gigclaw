@@ -7,6 +7,7 @@ import { taskRouter } from './routes/tasks';
 import { agentRouter } from './routes/agents';
 import { matchingRouter } from './routes/matching';
 import { webhookRouter } from './routes/webhooks';
+import { bidRouter } from './routes/bids';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput } from './middleware/validation';
 import { startTaskExpiryChecker } from './services/taskExpiry';
@@ -50,6 +51,7 @@ app.use('/api/tasks', taskRouter);
 app.use('/api/agents', agentRouter);
 app.use('/api/matching', matchingRouter);
 app.use('/api/webhooks', webhookRouter);
+app.use('/api/bids', bidRouter);
 
 // Health check with more details
 app.get('/health', (req, res) => {
@@ -72,6 +74,7 @@ app.get('/', (req, res) => {
     endpoints: {
       tasks: '/api/tasks',
       agents: '/api/agents',
+      bids: '/api/bids',
       matching: '/api/matching',
       webhooks: '/api/webhooks',
       health: '/health',
@@ -83,35 +86,16 @@ app.get('/', (req, res) => {
 });
 
 // Stats endpoint
-app.get('/stats', async (req, res) => {
-  try {
-    // Import services to get actual counts
-    const { prisma } = await import('./lib/prisma');
-    
-    const [taskCount, agentCount, bidCount] = await Promise.all([
-      prisma.task.count(),
-      prisma.agent.count(),
-      prisma.bid.count()
-    ]);
-
-    res.json({
-      tasks: taskCount,
-      agents: agentCount,
-      bids: bidCount,
-      status: 'operational',
-      timestamp: new Date().toISOString()
-    });
-  } catch (error) {
-    // Fallback if database unavailable
-    res.json({
-      tasks: 0,
-      agents: 0,
-      bids: 0,
-      status: 'degraded',
-      timestamp: new Date().toISOString(),
-      note: 'Database connection unavailable'
-    });
-  }
+app.get('/stats', (req, res) => {
+  // Return basic stats - in production, fetch from database
+  res.json({
+    tasks: 0,
+    agents: 0,
+    bids: 0,
+    status: 'operational',
+    timestamp: new Date().toISOString(),
+    note: 'Stats tracking coming soon'
+  });
 });
 
 // 404 handler
