@@ -155,7 +155,7 @@ votingRouter.get('/results/:proposalId', (req, res) => {
     results: {
       totalVotes,
       totalWeight,
-      tallies: proposal.options.map((option, i) => ({
+      tallies: proposal.options.map((option: string, i: number) => ({
         option,
         votes: tallies[i]
       }))

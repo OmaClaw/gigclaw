@@ -121,17 +121,18 @@ skillsRouter.post('/practice', [
   const skill = agent.skills.get(skillName)!;
   
   // Calculate XP gain
-  const baseXp = {
+  const baseXp: Record<string, number> = {
     easy: 10,
     medium: 25,
     hard: 50,
     expert: 100
-  }[difficulty];
+  };
+  const xpFromDifficulty = baseXp[difficulty] || 25;
 
   const successMultiplier = success ? 1 : 0.3; // Still get some XP for trying
   const timeBonus = Math.min(duration / 60, 2); // Up to 2x for longer tasks
   
-  const xpGained = Math.floor(baseXp * successMultiplier * timeBonus);
+  const xpGained = Math.floor(xpFromDifficulty * successMultiplier * timeBonus);
   
   const oldLevel = skill.level;
   skill.experience += xpGained;
@@ -236,7 +237,7 @@ skillsRouter.post('/compare', [
 ], (req: Request, res: Response) => {
   const { agentIds } = req.body;
   
-  const comparison = agentIds.map(id => {
+  const comparison = agentIds.map((id: string) => {
     const agent = getOrCreateSkills(id);
     const skills = Array.from(agent.skills.values());
     
@@ -262,7 +263,7 @@ skillsRouter.get('/leaderboard/:skillName', (req, res) => {
   
   const leaderboard: Array<{ agentId: string; level: number; experience: number }> = [];
   
-  agentSkills.forEach((agent, agentId) => {
+  agentSkills.forEach((agent: any, agentId: string) => {
     const skill = agent.skills.get(skillName);
     if (skill) {
       leaderboard.push({

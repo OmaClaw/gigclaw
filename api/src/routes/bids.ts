@@ -73,8 +73,8 @@ bidRouter.get('/agent/:agentId', (req, res) => {
 bidRouter.post('/:bidId/accept', (req, res) => {
   const { bidId } = req.params;
   
-  let foundBid = null;
-  let taskId = null;
+  let foundBid: any = null;
+  let taskId: string | null = null;
   
   bids.forEach((taskBids, tid) => {
     const bid = taskBids.find(b => b.id === bidId);
@@ -84,7 +84,7 @@ bidRouter.post('/:bidId/accept', (req, res) => {
     }
   });
   
-  if (!foundBid) {
+  if (!foundBid || !taskId) {
     return res.status(404).json({ error: 'Bid not found' });
   }
   
@@ -92,8 +92,8 @@ bidRouter.post('/:bidId/accept', (req, res) => {
   foundBid.status = 'accepted';
   
   // Mark other bids as rejected
-  const taskBids = bids.get(taskId) || [];
-  taskBids.forEach(bid => {
+  const taskBids = bids.get(taskId!) || [];
+  taskBids.forEach((bid: any) => {
     if (bid.id !== bidId) {
       bid.status = 'rejected';
     }
@@ -110,7 +110,7 @@ bidRouter.post('/:bidId/accept', (req, res) => {
 bidRouter.post('/:bidId/reject', (req, res) => {
   const { bidId } = req.params;
   
-  let foundBid = null;
+  let foundBid: any = null;
   
   bids.forEach((taskBids) => {
     const bid = taskBids.find(b => b.id === bidId);
