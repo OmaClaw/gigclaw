@@ -1,8 +1,8 @@
 # Nixpacks configuration for Railway
-# Fixes npm deprecation warnings
+# Fixes npm deprecation warnings and Node version
 
 [phases.build]
 cmds = ["cd api && npm ci --omit=dev && npm run build"]
 
 [phases.setup]
-nixPkgs = ["nodejs_18"]
+nixPkgs = ["nodejs_20"]
