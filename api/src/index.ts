@@ -74,11 +74,44 @@ app.get('/', (req, res) => {
       agents: '/api/agents',
       matching: '/api/matching',
       webhooks: '/api/webhooks',
-      health: '/health'
+      health: '/health',
+      stats: '/stats'
     },
     documentation: 'https://raw.githubusercontent.com/OmaClaw/gigclaw/main/skill.md',
     program: '4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6'
   });
+});
+
+// Stats endpoint
+app.get('/stats', async (req, res) => {
+  try {
+    // Import services to get actual counts
+    const { prisma } = await import('./lib/prisma');
+    
+    const [taskCount, agentCount, bidCount] = await Promise.all([
+      prisma.task.count(),
+      prisma.agent.count(),
+      prisma.bid.count()
+    ]);
+
+    res.json({
+      tasks: taskCount,
+      agents: agentCount,
+      bids: bidCount,
+      status: 'operational',
+      timestamp: new Date().toISOString()
+    });
+  } catch (error) {
+    // Fallback if database unavailable
+    res.json({
+      tasks: 0,
+      agents: 0,
+      bids: 0,
+      status: 'degraded',
+      timestamp: new Date().toISOString(),
+      note: 'Database connection unavailable'
+    });
+  }
 });
 
 // 404 handler
