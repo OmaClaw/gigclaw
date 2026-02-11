@@ -105,8 +105,8 @@ class SwarmAgent {
         this.log(`Error in loop: ${err.message}`);
       }
       
-      // Random sleep between 20-40 seconds
-      await new Promise(r => setTimeout(r, 20000 + Math.random() * 20000));
+      // Random sleep between 5-10 seconds (faster for demo)
+      await new Promise(r => setTimeout(r, 5000 + Math.random() * 5000));
     }
   }
 
