@@ -1,0 +1,381 @@
+#!/usr/bin/env node
+/**
+ * GigClaw Multi-Agent Swarm
+ * 
+ * Deploy multiple autonomous agents that interact on the marketplace
+ * Shows real agent economy in action
+ * 
+ * Run: node agents/swarm.js [agent_count]
+ */
+
+const API_URL = process.env.GIGCLAW_API_URL || 'https://gigclaw-production.up.railway.app';
+const AGENT_COUNT = parseInt(process.argv[2]) || 3;
+
+class SwarmAgent {
+  constructor(index) {
+    this.agentId = `swarm-${index}-${Date.now().toString(36).slice(-4)}`;
+    this.name = this.generateName(index);
+    this.skills = this.generateSkills(index);
+    this.reputation = 50;
+    this.balance = 50 + Math.floor(Math.random() * 100);
+    this.activeTasks = new Map();
+    this.completedTasks = [];
+    this.bidsMade = 0;
+    this.tasksPosted = 0;
+    
+    this.log('Initialized');
+  }
+
+  generateName(index) {
+    const prefixes = ['Alpha', 'Beta', 'Gamma', 'Delta', 'Epsilon', 'Zeta', 'Theta', 'Omega'];
+    const suffixes = ['Bot', 'Agent', 'Worker', 'Node', 'Unit', 'Drone'];
+    return `${prefixes[index % prefixes.length]}${suffixes[index % suffixes.length]}`;
+  }
+
+  generateSkills(index) {
+    const allSkills = [
+      'javascript', 'typescript', 'rust', 'python', 'go',
+      'smart-contracts', 'api-integration', 'data-processing',
+      'machine-learning', 'devops', 'security', 'testing',
+      'web-scraping', 'analytics', 'automation'
+    ];
+    // Each agent gets 3-5 random skills
+    const count = 3 + Math.floor(Math.random() * 3);
+    const shuffled = [...allSkills].sort(() => 0.5 - Math.random());
+    return shuffled.slice(0, count);
+  }
+
+  log(message) {
+    const timestamp = new Date().toISOString().split('T')[1].split('.')[0];
+    console.log(`[${timestamp}] [${this.name}] ${message}`);
+  }
+
+  async start() {
+    await this.register();
+    
+    // Random start delay to stagger agents
+    const delay = Math.random() * 10000;
+    await new Promise(r => setTimeout(r, delay));
+    
+    // Start autonomous loop
+    this.autonomousLoop();
+  }
+
+  async register() {
+    try {
+      const res = await fetch(`${API_URL}/api/agents`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentId: this.agentId,
+          name: this.name,
+          capabilities: this.skills,
+          minRate: 10 + Math.floor(Math.random() * 20),
+          availability: 'full-time'
+        })
+      });
+      
+      if (res.ok || res.status === 409) {
+        this.log('Registered on marketplace');
+      }
+    } catch (err) {
+      this.log(`Registration warning: ${err.message}`);
+    }
+  }
+
+  async autonomousLoop() {
+    while (true) {
+      const action = Math.random();
+      
+      try {
+        if (action < 0.25) {
+          await this.postTask();
+        } else if (action < 0.55) {
+          await this.findAndBidOnTasks();
+        } else if (action < 0.75) {
+          await this.practiceSkill();
+        } else if (action < 0.90) {
+          await this.checkReputation();
+        } else {
+          await this.checkNegotiations();
+        }
+        
+        await this.checkForCompletedWork();
+      } catch (err) {
+        this.log(`Error in loop: ${err.message}`);
+      }
+      
+      // Random sleep between 20-40 seconds
+      await new Promise(r => setTimeout(r, 20000 + Math.random() * 20000));
+    }
+  }
+
+  async postTask() {
+    const taskTypes = [
+      { title: 'Smart Contract Review', category: 'security', budget: 30 },
+      { title: 'API Integration', category: 'development', budget: 20 },
+      { title: 'Data Pipeline Setup', category: 'data-processing', budget: 25 },
+      { title: 'ML Model Training', category: 'machine-learning', budget: 50 },
+      { title: 'DevOps Automation', category: 'devops', budget: 35 },
+      { title: 'Web Scraping Job', category: 'web-scraping', budget: 15 },
+      { title: 'Code Testing Suite', category: 'testing', budget: 20 },
+      { title: 'Analytics Dashboard', category: 'analytics', budget: 25 }
+    ];
+    
+    const task = taskTypes[Math.floor(Math.random() * taskTypes.length)];
+    
+    try {
+      const res = await fetch(`${API_URL}/api/tasks`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: task.title,
+          description: `Need ${task.title.toLowerCase()} completed. Budget: $${task.budget}.`,
+          category: task.category,
+          budget: task.budget,
+          deadline: Date.now() + 86400000,
+          creatorId: this.agentId,
+          escrowAmount: task.budget
+        })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        this.tasksPosted++;
+        this.log(`📋 Posted task: "${task.title}" ($${task.budget})`);
+        this.activeTasks.set(data.task.id, data.task);
+      }
+    } catch (err) {
+      // Silently fail - network issues happen
+    }
+  }
+
+  async findAndBidOnTasks() {
+    try {
+      const res = await fetch(`${API_URL}/api/tasks?status=open`);
+      if (!res.ok) return;
+      
+      const data = await res.json();
+      const openTasks = data.tasks?.filter(t => 
+        t.creatorId !== this.agentId && 
+        !t.bids?.some(b => b.agentId === this.agentId)
+      ) || [];
+      
+      if (openTasks.length === 0) return;
+      
+      // Pick best matching task
+      const matchingTask = openTasks.find(t => 
+        this.skills.some(s => t.category?.includes(s))
+      ) || openTasks[0];
+      
+      const bidAmount = Math.max(5, Math.floor(matchingTask.budget * (0.6 + Math.random() * 0.3)));
+      
+      const bidRes = await fetch(`${API_URL}/api/bids`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          taskId: matchingTask.id,
+          agentId: this.agentId,
+          proposedPrice: bidAmount,
+          estimatedHours: Math.floor(Math.random() * 4) + 1,
+          message: `${this.name} here! I specialize in ${this.skills.slice(0,2).join(', ')}. Ready to deliver quality work.`,
+          relevantSkills: this.skills.filter(s => matchingTask.category?.includes(s))
+        })
+      });
+      
+      if (bidRes.ok) {
+        this.bidsMade++;
+        this.log(`💰 Bid $${bidAmount} on "${matchingTask.title?.slice(0,30)}..."`);
+      }
+    } catch (err) {
+      // Silently fail
+    }
+  }
+
+  async practiceSkill() {
+    const skill = this.skills[Math.floor(Math.random() * this.skills.length)];
+    const difficulties = ['easy', 'medium', 'hard'];
+    const difficulty = difficulties[Math.floor(Math.random() * difficulties.length)];
+    
+    try {
+      const res = await fetch(`${API_URL}/api/skills/${this.agentId}/practice`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          skillName: skill,
+          difficulty,
+          success: Math.random() > 0.15,
+          duration: Math.floor(Math.random() * 300) + 60
+        })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        if (data.skill?.leveledUp) {
+          this.log(`🎉 LEVELED UP! ${skill} → Level ${data.skill.level}`);
+        } else {
+          this.log(`📚 Practiced ${skill} (+${data.skill?.xpGained || 0} XP)`);
+        }
+      }
+    } catch (err) {
+      // Silently fail
+    }
+  }
+
+  async checkReputation() {
+    try {
+      const res = await fetch(`${API_URL}/api/reputation/${this.agentId}`);
+      if (res.ok) {
+        const data = await res.json();
+        if (Math.abs(this.reputation - data.effectiveReputation) > 5) {
+          this.log(`📊 Rep: ${this.reputation} → ${data.effectiveReputation} (${data.streakDays}d streak)`);
+        }
+        this.reputation = data.effectiveReputation;
+      }
+    } catch (err) {
+      // Silently fail
+    }
+  }
+
+  async checkNegotiations() {
+    // Check for active negotiations and respond
+    try {
+      const res = await fetch(`${API_URL}/api/negotiations/${this.agentId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const pending = data.negotiations?.filter(n => n.status === 'pending') || [];
+        
+        for (const neg of pending) {
+          // Simple auto-response: accept if reasonable
+          const newPrice = Math.floor(neg.proposedPrice * 0.9);
+          
+          await fetch(`${API_URL}/api/negotiations/${neg.id}/respond`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({
+              agentId: this.agentId,
+              responseType: 'counter',
+              message: `How about $${newPrice}? Fair price for quality work.`,
+              proposedPrice: newPrice
+            })
+          });
+          
+          this.log(`🤝 Counter-offer: $${newPrice} on negotiation`);
+        }
+      }
+    } catch (err) {
+      // Silently fail
+    }
+  }
+
+  async checkForCompletedWork() {
+    try {
+      const res = await fetch(`${API_URL}/api/bids/agent/${this.agentId}`);
+      if (!res.ok) return;
+      
+      const data = await res.json();
+      const acceptedBids = data.bids?.filter(b => 
+        b.status === 'accepted' && !this.completedTasks.includes(b.taskId)
+      ) || [];
+      
+      for (const bid of acceptedBids) {
+        this.log(`🔨 Working on task ${bid.taskId.slice(-6)}...`);
+        await new Promise(r => setTimeout(r, 3000 + Math.random() * 4000));
+        this.log(`✅ Completed task ${bid.taskId.slice(-6)}!`);
+        this.completedTasks.push(bid.taskId);
+        await this.checkReputation();
+      }
+    } catch (err) {
+      // Silently fail
+    }
+  }
+
+  getStats() {
+    return {
+      name: this.name,
+      agentId: this.agentId.slice(-8),
+      reputation: this.reputation,
+      balance: this.balance,
+      skills: this.skills.length,
+      tasksPosted: this.tasksPosted,
+      bidsMade: this.bidsMade,
+      tasksCompleted: this.completedTasks.length,
+      activeTasks: this.activeTasks.size
+    };
+  }
+}
+
+// ===== SWARM ORCHESTRATOR =====
+
+console.log('╔══════════════════════════════════════════════════════════╗');
+console.log('║  GigClaw Multi-Agent Swarm                               ║');
+console.log('║  Live Agent Economy in Action                            ║');
+console.log(`║  Deploying ${AGENT_COUNT} autonomous agents...                    ║`);
+console.log('╚══════════════════════════════════════════════════════════╝\n');
+
+const agents = [];
+
+async function launchSwarm() {
+  // Launch agents with staggered start
+  for (let i = 0; i < AGENT_COUNT; i++) {
+    const agent = new SwarmAgent(i);
+    agents.push(agent);
+    agent.start();
+    
+    // Stagger launches
+    await new Promise(r => setTimeout(r, 2000));
+  }
+  
+  console.log(`\n✅ ${AGENT_COUNT} agents deployed and running\n`);
+  console.log('Agents will:');
+  console.log('  • Post tasks autonomously');
+  console.log('  • Bid on available work');
+  console.log('  • Practice skills and level up');
+  console.log('  • Complete accepted tasks');
+  console.log('  • Negotiate deals\n');
+}
+
+// Status dashboard
+setInterval(() => {
+  console.log('\n' + '═'.repeat(70));
+  console.log(' SWARM STATUS REPORT');
+  console.log('═'.repeat(70));
+  
+  const stats = agents.map(a => a.getStats());
+  const totalTasksPosted = stats.reduce((sum, s) => sum + s.tasksPosted, 0);
+  const totalBidsMade = stats.reduce((sum, s) => sum + s.bidsMade, 0);
+  const totalCompleted = stats.reduce((sum, s) => sum + s.tasksCompleted, 0);
+  const avgReputation = Math.round(stats.reduce((sum, s) => sum + s.reputation, 0) / stats.length);
+  
+  console.log(`\n📊 SWARM METRICS`);
+  console.log(`   Active Agents: ${agents.length}`);
+  console.log(`   Tasks Posted: ${totalTasksPosted}`);
+  console.log(`   Bids Submitted: ${totalBidsMade}`);
+  console.log(`   Tasks Completed: ${totalCompleted}`);
+  console.log(`   Avg Reputation: ${avgReputation}`);
+  
+  console.log(`\n👤 AGENT DETAILS`);
+  stats.forEach(s => {
+    console.log(`   ${s.name.padEnd(12)} | Rep: ${s.reputation.toString().padStart(3)} | Tasks: ${s.tasksPosted}/${s.tasksCompleted} | Bids: ${s.bidsMade}`);
+  });
+  
+  console.log('\n' + '─'.repeat(70));
+}, 60000); // Every minute
+
+// Graceful shutdown
+process.on('SIGINT', () => {
+  console.log('\n\n╔══════════════════════════════════════════════════════════╗');
+  console.log('║  SWARM SHUTDOWN                                          ║');
+  console.log('╚══════════════════════════════════════════════════════════╝');
+  
+  const stats = agents.map(a => a.getStats());
+  console.log('\nFINAL STATS:');
+  stats.forEach(s => {
+    console.log(`  ${s.name}: ${s.tasksPosted} posted, ${s.bidsMade} bids, ${s.tasksCompleted} completed`);
+  });
+  
+  process.exit(0);
+});
+
+// Start the swarm
+launchSwarm();
