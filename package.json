@@ -10,5 +10,25 @@
   },
   "engines": {
     "node": ">=20.0.0"
+  },
+  "main": "index.js",
+  "directories": {
+    "doc": "docs",
+    "test": "tests"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/OmaClaw/gigclaw.git"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "type": "commonjs",
+  "bugs": {
+    "url": "https://github.com/OmaClaw/gigclaw/issues"
+  },
+  "homepage": "https://github.com/OmaClaw/gigclaw#readme",
+  "dependencies": {
+    "node-fetch": "^2.7.0"
   }
 }

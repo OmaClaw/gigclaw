@@ -8,6 +8,8 @@
  * Run: node agents/swarm.js [agent_count]
  */
 
+const fetch = require('node-fetch');
+
 const API_URL = process.env.GIGCLAW_API_URL || 'https://gigclaw-production.up.railway.app';
 const AGENT_COUNT = parseInt(process.argv[2]) || 3;
 
@@ -63,20 +65,22 @@ class SwarmAgent {
 
   async register() {
     try {
-      const res = await fetch(`${API_URL}/api/agents`, {
+      const res = await fetch(`${API_URL}/api/agents/register`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           agentId: this.agentId,
           name: this.name,
-          capabilities: this.skills,
-          minRate: 10 + Math.floor(Math.random() * 20),
-          availability: 'full-time'
+          skills: this.skills,
+          walletAddress: `${this.agentId}@gigclaw.local`
         })
       });
       
-      if (res.ok || res.status === 409) {
+      if (res.ok) {
         this.log('Registered on marketplace');
+      } else {
+        const err = await res.json();
+        this.log(`Registration failed: ${err.error}`);
       }
     } catch (err) {
       this.log(`Registration warning: ${err.message}`);
@@ -112,14 +116,11 @@ class SwarmAgent {
 
   async postTask() {
     const taskTypes = [
-      { title: 'Smart Contract Review', category: 'security', budget: 30 },
-      { title: 'API Integration', category: 'development', budget: 20 },
-      { title: 'Data Pipeline Setup', category: 'data-processing', budget: 25 },
-      { title: 'ML Model Training', category: 'machine-learning', budget: 50 },
-      { title: 'DevOps Automation', category: 'devops', budget: 35 },
-      { title: 'Web Scraping Job', category: 'web-scraping', budget: 15 },
-      { title: 'Code Testing Suite', category: 'testing', budget: 20 },
-      { title: 'Analytics Dashboard', category: 'analytics', budget: 25 }
+      { title: 'Smart Contract Review Required', description: 'Need comprehensive review of Solana smart contracts for security vulnerabilities and optimization opportunities. Must have Anchor experience.', category: 'security', budget: 30 },
+      { title: 'API Integration Development', description: 'Build integration between our service and external REST APIs. Require error handling, rate limiting, and webhook support.', category: 'development', budget: 20 },
+      { title: 'Data Pipeline Architecture', description: 'Design and implement ETL pipeline for processing blockchain data streams. Experience with PostgreSQL required.', category: 'data-processing', budget: 25 },
+      { title: 'ML Model Training Job', description: 'Train classification model on agent behavior dataset. Python, TensorFlow/PyTorch experience needed.', category: 'machine-learning', budget: 50 },
+      { title: 'DevOps CI/CD Setup', description: 'Configure GitHub Actions workflows for automated testing and deployment. Docker experience preferred.', category: 'devops', budget: 35 }
     ];
     
     const task = taskTypes[Math.floor(Math.random() * taskTypes.length)];
@@ -130,65 +131,70 @@ class SwarmAgent {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           title: task.title,
-          description: `Need ${task.title.toLowerCase()} completed. Budget: $${task.budget}.`,
-          category: task.category,
+          description: task.description,
           budget: task.budget,
-          deadline: Date.now() + 86400000,
-          creatorId: this.agentId,
-          escrowAmount: task.budget
+          deadline: new Date(Date.now() + 86400000).toISOString(),
+          requiredSkills: [task.category, ...this.skills.slice(0, 2)],
+          posterId: this.agentId
         })
       });
       
       if (res.ok) {
         const data = await res.json();
         this.tasksPosted++;
-        this.log(`📋 Posted task: "${task.title}" ($${task.budget})`);
-        this.activeTasks.set(data.task.id, data.task);
+        this.log(`📋 Posted task: "${task.title.slice(0, 40)}..." ($${task.budget})`);
+      } else {
+        const err = await res.json();
+        this.log(`Failed to post task: ${err.error || 'Unknown error'}`);
       }
     } catch (err) {
-      // Silently fail - network issues happen
+      this.log(`Post task error: ${err.message}`);
     }
   }
 
   async findAndBidOnTasks() {
     try {
-      const res = await fetch(`${API_URL}/api/tasks?status=open`);
+      const res = await fetch(`${API_URL}/api/tasks`);
       if (!res.ok) return;
       
       const data = await res.json();
       const openTasks = data.tasks?.filter(t => 
-        t.creatorId !== this.agentId && 
+        t.posterId !== this.agentId && 
         !t.bids?.some(b => b.agentId === this.agentId)
       ) || [];
       
-      if (openTasks.length === 0) return;
+      if (openTasks.length === 0) {
+        this.log('No open tasks to bid on');
+        return;
+      }
       
       // Pick best matching task
       const matchingTask = openTasks.find(t => 
-        this.skills.some(s => t.category?.includes(s))
+        t.requiredSkills?.some(s => this.skills.includes(s))
       ) || openTasks[0];
       
       const bidAmount = Math.max(5, Math.floor(matchingTask.budget * (0.6 + Math.random() * 0.3)));
       
-      const bidRes = await fetch(`${API_URL}/api/bids`, {
+      const bidRes = await fetch(`${API_URL}/api/tasks/${matchingTask.id}/bid`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          taskId: matchingTask.id,
           agentId: this.agentId,
-          proposedPrice: bidAmount,
-          estimatedHours: Math.floor(Math.random() * 4) + 1,
+          amount: bidAmount,
           message: `${this.name} here! I specialize in ${this.skills.slice(0,2).join(', ')}. Ready to deliver quality work.`,
-          relevantSkills: this.skills.filter(s => matchingTask.category?.includes(s))
+          estimatedHours: Math.floor(Math.random() * 4) + 1
         })
       });
       
       if (bidRes.ok) {
         this.bidsMade++;
         this.log(`💰 Bid $${bidAmount} on "${matchingTask.title?.slice(0,30)}..."`);
+      } else {
+        const err = await bidRes.json();
+        this.log(`Bid failed: ${err.error || 'Unknown'}`);
       }
     } catch (err) {
-      // Silently fail
+      this.log(`Bid error: ${err.message}`);
     }
   }
 

@@ -8,6 +8,8 @@
  * Run: node agents/alphabot.js
  */
 
+const fetch = require('node-fetch');
+
 const API_URL = process.env.GIGCLAW_API_URL || 'https://gigclaw-production.up.railway.app';
 
 class AlphaBot {
