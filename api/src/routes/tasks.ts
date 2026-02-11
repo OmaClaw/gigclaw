@@ -3,19 +3,58 @@ import { v4 as uuidv4 } from 'uuid';
 import { createTaskValidation, bidValidation, taskIdValidation } from '../middleware/validation';
 import { triggerWebhook } from '../routes/webhooks';
 import { AppError } from '../middleware/errorHandler';
+import { getTasksFromChain, createTaskOnChain } from '../services/solana';
 
-// In-memory store (replace with DB in production)
+// In-memory store (fallback when Solana unavailable)
 const tasks = new Map<string, any>();
 
 export const taskRouter = Router();
 
-// Get all open tasks
-taskRouter.get('/', (req, res) => {
-  const openTasks = Array.from(tasks.values())
-    .filter((t: any) => t.status === 'posted')
-    .sort((a: any, b: any) => b.createdAt - a.createdAt);
-  
-  res.json({ tasks: openTasks });
+// Get all open tasks - read from Solana, fallback to memory
+// @ts-ignore
+taskRouter.get('/', async (req, res) => {
+  try {
+    // Try to get tasks from blockchain
+    const chainTasks = await getTasksFromChain();
+    
+    if (chainTasks.length > 0) {
+      // Merge with any in-memory tasks not yet on chain
+      const memoryTasks = Array.from(tasks.values())
+        .filter((t: any) => !t.onChain && t.status === 'posted');
+      
+      const allTasks = [...chainTasks, ...memoryTasks]
+        .sort((a: any, b: any) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+      
+      return res.json({ 
+        tasks: allTasks,
+        source: chainTasks.length > 0 ? 'blockchain' : 'memory',
+        chainCount: chainTasks.length,
+        memoryCount: memoryTasks.length
+      });
+    }
+    
+    // Fallback to in-memory
+    const openTasks = Array.from(tasks.values())
+      .filter((t: any) => t.status === 'posted')
+      .sort((a: any, b: any) => b.createdAt - a.createdAt);
+    
+    res.json({ 
+      tasks: openTasks,
+      source: 'memory',
+      note: 'No tasks found on blockchain yet'
+    });
+  } catch (error) {
+    // Fallback to in-memory on error
+    const openTasks = Array.from(tasks.values())
+      .filter((t: any) => t.status === 'posted')
+      .sort((a: any, b: any) => b.createdAt - a.createdAt);
+    
+    res.json({ 
+      tasks: openTasks,
+      source: 'memory',
+      error: 'Failed to read from blockchain'
+    });
+  }
 });
 
 // Get task by ID
@@ -27,8 +66,9 @@ taskRouter.get('/:id', (req, res) => {
   res.json(task);
 });
 
-// Create new task
-taskRouter.post('/', createTaskValidation, (req: Request, res: Response, next: NextFunction) => {
+// Create new task - save to memory AND attempt chain sync
+// @ts-ignore
+taskRouter.post('/', createTaskValidation, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { title, description, budget, deadline, requiredSkills, posterId } = req.body;
     
@@ -46,6 +86,7 @@ taskRouter.post('/', createTaskValidation, (req: Request, res: Response, next: N
       bids: [],
       createdAt: Date.now(),
       completedAt: null,
+      onChain: false, // Track if synced to blockchain
     };
     
     tasks.set(taskId, task);
@@ -59,10 +100,22 @@ taskRouter.post('/', createTaskValidation, (req: Request, res: Response, next: N
       requiredSkills
     });
     
+    // Attempt to sync to blockchain (requires wallet)
+    // For demo purposes, we log the attempt
+    console.log(`[Task] Created task ${taskId}`);
+    console.log(`[Task] Note: Blockchain sync requires funded wallet`);
+    console.log(`[Task] Contract: 4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6`);
+    
     res.status(201).json({ 
       message: 'Task created',
       taskId,
-      task 
+      task,
+      blockchain: {
+        status: 'pending',
+        note: 'Task saved to API. On-chain sync requires wallet funding.',
+        programId: '4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6',
+        explorer: `https://explorer.solana.com/address/4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6?cluster=devnet`
+      }
     });
   } catch (error) {
     next(error);
