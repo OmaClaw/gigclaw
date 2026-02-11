@@ -8,6 +8,25 @@ export const standupRouter = Router();
 const standups = new Map<string, any[]>(); // agentId -> standup history
 const relationships = new Map<string, Map<string, number>>(); // agentId -> relationships
 
+// GET /api/standups - List all standups
+standupRouter.get('/', (req: Request, res: Response) => {
+  const allStandups: any[] = [];
+  standups.forEach((agentStandups, agentId) => {
+    agentStandups.forEach(standup => {
+      allStandups.push({ ...standup, agentId });
+    });
+  });
+  
+  // Sort by timestamp descending
+  allStandups.sort((a, b) => b.timestamp - a.timestamp);
+  
+  res.json({
+    standups: allStandups.slice(0, 50), // Last 50
+    count: allStandups.length,
+    activeAgents: standups.size
+  });
+});
+
 // Agent memory/action items
 interface AgentMemory {
   agentId: string;
