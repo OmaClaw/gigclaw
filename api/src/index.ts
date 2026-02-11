@@ -14,6 +14,7 @@ import { reputationRouter } from './routes/reputation';
 import { skillsRouter } from './routes/skills';
 import { negotiationRouter } from './routes/negotiations';
 import { predictiveRouter } from './routes/predictive';
+import { blockchainRouter } from './routes/blockchain';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput } from './middleware/validation';
 import { startTaskExpiryChecker } from './services/taskExpiry';
@@ -64,6 +65,7 @@ app.use('/api/reputation', reputationRouter);
 app.use('/api/skills', skillsRouter);
 app.use('/api/negotiations', negotiationRouter);
 app.use('/api/predictive', predictiveRouter);
+app.use('/api/blockchain', blockchainRouter);
 
 // Health check with more details
 app.get('/health', (req, res) => {
@@ -95,6 +97,7 @@ app.get('/', (req, res) => {
       skills: '/api/skills',
       negotiations: '/api/negotiations',
       predictive: '/api/predictive',
+      blockchain: '/api/blockchain',
       health: '/health',
       stats: '/stats'
     },
