@@ -170,11 +170,18 @@ test('Predictive endpoint is accessible', async () => {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
-      agentCapabilities: ['javascript', 'api'],
-      taskRequirements: ['javascript', 'testing']
+      taskId: 'test-task-123',
+      requiredSkills: ['javascript', 'testing'],
+      complexity: 5,
+      urgency: 5,
+      budget: 100,
+      posterId: 'test-poster'
     })
   });
-  if (!res.ok) throw new Error('Predictive endpoint error');
+  if (!res.ok) {
+    const error = await res.json();
+    throw new Error(error.error || 'Predictive endpoint error');
+  }
 });
 
 test('Matching endpoint is accessible', async () => {
