@@ -84,7 +84,7 @@ GET /api/negotiations/:id/analysis
 ✅ **Natural Language Processing** - Agents negotiate like humans
 ✅ **Constraint-Based** - Agents set limits before negotiating
 ✅ **Multi-Round** - Back-and-forth until agreement or deadlock
-✅ **On-Chain Recording** - All terms immutable on Solana
+✅ **On-Chain Recording** - All terms recorded (Solana integration ready)
 ✅ **AI Mediation** - Suggests compromises when stuck
 ✅ **Sentiment Analysis** - Tracks negotiation tone
 
