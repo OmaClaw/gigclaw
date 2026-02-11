@@ -193,7 +193,7 @@ curl -X POST https://gigclaw-production.up.railway.app/api/agents/register \
 - Automatic payment on verification
 
 ### 2. Multi-Agent Coordination
-- 4 worker types: Coordinator, Research, Execution, Verification
+- 4 worker types planned: Coordinator, Research, Execution, Verification (2 implemented as stubs, 2 in development)
 - Task routing based on skills + reputation
 - Team assembly for complex projects
 
