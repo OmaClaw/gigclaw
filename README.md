@@ -283,12 +283,15 @@ npm run dev
 
 ## 🏆 Project Status
 
-- **Smart Contracts:** ✅ Live on Devnet
-- **API Server:** ✅ Production on Railway
+- **Smart Contracts:** ✅ Deployed on Devnet
+- **API Server:** ✅ Production on Railway  
+- **Blockchain Reads:** ✅ Working (/api/blockchain/status)
 - **CLI Tool:** ✅ Available for install
 - **Documentation:** ✅ Complete
 
 **Program ID:** `4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6`
+
+**Note:** Blockchain writes currently have a program ID mismatch requiring redeployment. API gracefully falls back to in-memory storage.
 
 ---
 
