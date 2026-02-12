@@ -66,14 +66,14 @@ taskRouter.get('/:id', (req, res) => {
   res.json(task);
 });
 
-// Create new task - save to memory AND attempt chain sync
+// Create new task - save to memory AND create on blockchain
 // @ts-ignore
 taskRouter.post('/', createTaskValidation, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { title, description, budget, deadline, requiredSkills, posterId } = req.body;
     
     const taskId = uuidv4();
-    const task = {
+    const task: any = {
       id: taskId,
       title,
       description,
@@ -86,7 +86,8 @@ taskRouter.post('/', createTaskValidation, async (req: Request, res: Response, n
       bids: [],
       createdAt: Date.now(),
       completedAt: null,
-      onChain: false, // Track if synced to blockchain
+      onChain: false,
+      signature: null as string | null
     };
     
     tasks.set(taskId, task);
@@ -100,22 +101,54 @@ taskRouter.post('/', createTaskValidation, async (req: Request, res: Response, n
       requiredSkills
     });
     
-    // Attempt to sync to blockchain (requires wallet)
-    // For demo purposes, we log the attempt
-    console.log(`[Task] Created task ${taskId}`);
-    console.log(`[Task] Note: Blockchain sync requires funded wallet`);
-    console.log(`[Task] Contract: 4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6`);
+    // Create on blockchain with funded wallet
+    let blockchainResult: any = {
+      status: 'pending',
+      note: 'Blockchain creation not attempted'
+    };
+    
+    try {
+      console.log(`[Task] Creating task ${taskId} on blockchain...`);
+      const result = await createTaskOnChain(
+        taskId,
+        title,
+        description,
+        budget,
+        new Date(deadline),
+        requiredSkills
+      );
+      
+      if (result.success) {
+        task.onChain = true;
+        task.signature = result.signature;
+        blockchainResult = {
+          status: 'confirmed',
+          signature: result.signature,
+          explorer: `https://explorer.solana.com/tx/${result.signature}?cluster=devnet`
+        };
+        console.log(`[Task] ✅ Task ${taskId} created on chain:`, result.signature);
+      } else {
+        blockchainResult = {
+          status: 'failed',
+          error: result.error,
+          note: 'Task saved to API but blockchain creation failed'
+        };
+        console.error(`[Task] ❌ Blockchain creation failed:`, result.error);
+      }
+    } catch (chainError: any) {
+      blockchainResult = {
+        status: 'error',
+        error: chainError.message,
+        note: 'Task saved to API but blockchain creation error'
+      };
+      console.error(`[Task] ❌ Blockchain error:`, chainError.message);
+    }
     
     res.status(201).json({ 
       message: 'Task created',
       taskId,
       task,
-      blockchain: {
-        status: 'pending',
-        note: 'Task saved to API. On-chain sync requires wallet funding.',
-        programId: '4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6',
-        explorer: `https://explorer.solana.com/address/4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6?cluster=devnet`
-      }
+      blockchain: blockchainResult
     });
   } catch (error) {
     next(error);

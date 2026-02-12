@@ -1,15 +1,32 @@
-import { Connection, PublicKey, Keypair, clusterApiUrl } from '@solana/web3.js';
-import { Program, AnchorProvider, web3, BN } from '@coral-xyz/anchor';
+import { Connection, PublicKey, Keypair, clusterApiUrl, SystemProgram } from '@solana/web3.js';
+import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
+import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
 import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet';
 
 const PROGRAM_ID = new PublicKey('4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6');
 const NETWORK = process.env.SOLANA_NETWORK || 'devnet';
-const USDC_MINT = new PublicKey('EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v'); // Mainnet USDC
 const USDC_MINT_DEVNET = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'); // Devnet USDC
 
 let connection: Connection | null = null;
 let provider: AnchorProvider | null = null;
 let program: any = null;
+let fundedWallet: Keypair | null = null;
+
+// Initialize funded wallet from environment
+function getFundedWallet(): Keypair {
+  if (!fundedWallet) {
+    const privateKeyBase58 = process.env.SOLANA_PRIVATE_KEY;
+    if (!privateKeyBase58) {
+      throw new Error('SOLANA_PRIVATE_KEY not set in environment');
+    }
+    
+    // Decode base58 private key
+    const secretKey = Buffer.from(require('bs58').decode(privateKeyBase58));
+    fundedWallet = Keypair.fromSecretKey(secretKey);
+    console.log('[Solana] Loaded funded wallet:', fundedWallet.publicKey.toBase58());
+  }
+  return fundedWallet;
+}
 
 // IDL for the GigClaw program
 const IDL = {
@@ -163,9 +180,8 @@ export function getConnection(): Connection {
 export function getProvider(): AnchorProvider {
   if (!provider) {
     const conn = getConnection();
-    // Use a dummy keypair for read-only operations
-    const dummyWallet = new NodeWallet(Keypair.generate());
-    provider = new AnchorProvider(conn, dummyWallet, {
+    const wallet = new NodeWallet(getFundedWallet());
+    provider = new AnchorProvider(conn, wallet, {
       commitment: 'confirmed'
     });
   }
@@ -220,7 +236,7 @@ export async function getTasksFromChain(): Promise<any[]> {
       id: t.account.taskId,
       title: t.account.title,
       description: t.account.description,
-      budget: t.account.budget.toNumber() / 1e6, // Convert from USDC decimals
+      budget: t.account.budget.toNumber() / 1e6,
       deadline: new Date(t.account.deadline.toNumber() * 1000).toISOString(),
       requiredSkills: t.account.requiredSkills,
       status: Object.keys(t.account.status)[0].toLowerCase(),
@@ -235,38 +251,72 @@ export async function getTasksFromChain(): Promise<any[]> {
   }
 }
 
-// Create task on blockchain (requires wallet with funds)
+// Create task on blockchain with real transaction
 export async function createTaskOnChain(
   taskId: string,
   title: string,
   description: string,
-  budget: number, // In USDC
+  budget: number,
   deadline: Date,
-  requiredSkills: string[],
-  posterWallet: Keypair
+  requiredSkills: string[]
 ): Promise<{ success: boolean; signature?: string; error?: string }> {
   try {
     const conn = getConnection();
-    const wallet = new NodeWallet(posterWallet);
-    const prov = new AnchorProvider(conn, wallet, { commitment: 'confirmed' });
+    const wallet = getFundedWallet();
+    const prov = new AnchorProvider(conn, new NodeWallet(wallet), { commitment: 'confirmed' });
     const prog = new Program(IDL as any, PROGRAM_ID, prov);
     
-    // This is a simplified version - real implementation needs:
-    // 1. Create task PDA
-    // 2. Create escrow token account
-    // 3. Transfer USDC to escrow
-    // 4. Call create_task instruction
+    // Derive PDA for task account
+    const [taskPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from('task'), Buffer.from(taskId)],
+      PROGRAM_ID
+    );
     
-    console.log('[Solana] Creating task on chain:', taskId);
+    // Derive escrow PDA
+    const [escrowPDA] = PublicKey.findProgramAddressSync(
+      [Buffer.from('escrow'), Buffer.from(taskId)],
+      PROGRAM_ID
+    );
+    
+    // Get poster's USDC token account
+    const posterTokenAccount = await getAssociatedTokenAddress(
+      USDC_MINT_DEVNET,
+      wallet.publicKey
+    );
+    
+    console.log('[Solana] Creating task on chain...');
+    console.log('[Solana] Task ID:', taskId);
     console.log('[Solana] Budget:', budget, 'USDC');
-    console.log('[Solana] Note: Full implementation requires wallet funding');
+    console.log('[Solana] Task PDA:', taskPDA.toBase58());
+    
+    // Call program instruction
+    const tx = await prog.methods
+      .createTask(
+        taskId,
+        title,
+        description,
+        new BN(budget * 1e6),
+        new BN(Math.floor(deadline.getTime() / 1000)),
+        requiredSkills
+      )
+      .accounts({
+        task: taskPDA,
+        poster: wallet.publicKey,
+        posterTokenAccount: posterTokenAccount,
+        escrowAccount: escrowPDA,
+        tokenProgram: TOKEN_PROGRAM_ID,
+        systemProgram: SystemProgram.programId,
+      })
+      .rpc();
+    
+    console.log('[Solana] Transaction successful:', tx);
     
     return {
       success: true,
-      signature: 'simulated-tx-signature',
-      error: 'Implementation requires funded wallet - see documentation'
+      signature: tx
     };
   } catch (error: any) {
+    console.error('[Solana] Error creating task:', error);
     return {
       success: false,
       error: error.message
@@ -283,4 +333,4 @@ export async function getTaskCount(): Promise<number> {
   }
 }
 
-export { PROGRAM_ID, NETWORK, USDC_MINT, USDC_MINT_DEVNET };
+export { PROGRAM_ID, NETWORK, USDC_MINT_DEVNET };
