@@ -1,7 +1,5 @@
-import { Connection, PublicKey, Keypair, clusterApiUrl, SystemProgram } from '@solana/web3.js';
+import { Connection, PublicKey, Keypair, clusterApiUrl, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
-import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
-import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet';
 import bs58 from 'bs58';
 import fs from 'fs';
 import path from 'path';
@@ -10,11 +8,13 @@ import os from 'os';
 const PROGRAM_ID = new PublicKey('4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6');
 const NETWORK = process.env.SOLANA_NETWORK || 'devnet';
 const USDC_MINT_DEVNET = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'); // Devnet USDC
+const RENT_SYSVAR = new PublicKey('SysvarRent111111111111111111111111111111111');
 
 let connection: Connection | null = null;
-let provider: AnchorProvider | null = null;
-let program: any = null;
 let fundedWallet: Keypair | null = null;
+
+// Instruction discriminator for create_task (first 8 bytes of sha256("global:create_task"))
+const CREATE_TASK_DISCRIMINATOR = Buffer.from([0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab]);
 
 // Initialize funded wallet from environment or Solana CLI keypair file
 function getFundedWallet(): Keypair {
@@ -42,148 +42,6 @@ function getFundedWallet(): Keypair {
   return fundedWallet;
 }
 
-// IDL for the GigClaw program
-const IDL = {
-  "version": "0.1.0",
-  "name": "gigclaw",
-  "instructions": [
-    {
-      "name": "createTask",
-      "accounts": [
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "poster", "isMut": true, "isSigner": true },
-        { "name": "posterTokenAccount", "isMut": true, "isSigner": false },
-        { "name": "escrowAccount", "isMut": true, "isSigner": false },
-        { "name": "tokenProgram", "isMut": false, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
-      ],
-      "args": [
-        { "name": "taskId", "type": "string" },
-        { "name": "title", "type": "string" },
-        { "name": "description", "type": "string" },
-        { "name": "budget", "type": "u64" },
-        { "name": "deadline", "type": "i64" },
-        { "name": "requiredSkills", "type": { "vec": "string" } }
-      ]
-    },
-    {
-      "name": "bidOnTask",
-      "accounts": [
-        { "name": "task", "isMut": true, "isSigner": false },
-        { "name": "bid", "isMut": true, "isSigner": false },
-        { "name": "bidder", "isMut": true, "isSigner": true },
-        { "name": "bidderReputation", "isMut": true, "isSigner": false },
-        { "name": "systemProgram", "isMut": false, "isSigner": false }
-      ],
-      "args": [
-        { "name": "bidAmount", "type": "u64" },
-        { "name": "estimatedDuration", "type": "i64" }
-      ]
-    }
-  ],
-  "accounts": [
-    {
-      "name": "Task",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          { "name": "taskId", "type": "string" },
-          { "name": "poster", "type": "publicKey" },
-          { "name": "title", "type": "string" },
-          { "name": "description", "type": "string" },
-          { "name": "budget", "type": "u64" },
-          { "name": "finalBudget", "type": "u64" },
-          { "name": "deadline", "type": "i64" },
-          { "name": "requiredSkills", "type": { "vec": "string" } },
-          { "name": "status", "type": { "defined": "TaskStatus" } },
-          { "name": "assignedAgent", "type": { "option": "publicKey" } },
-          { "name": "createdAt", "type": "i64" },
-          { "name": "completedAt", "type": { "option": "i64" } },
-          { "name": "deliveryUrl", "type": { "option": "string" } },
-          { "name": "escrowBump", "type": "u8" },
-          { "name": "disputeReason", "type": { "option": "string" } },
-          { "name": "disputeInitiator", "type": { "option": "publicKey" } },
-          { "name": "disputeCreatedAt", "type": { "option": "i64" } }
-        ]
-      }
-    },
-    {
-      "name": "Bid",
-      "type": {
-        "kind": "struct",
-        "fields": [
-          { "name": "task", "type": "publicKey" },
-          { "name": "bidder", "type": "publicKey" },
-          { "name": "amount", "type": "u64" },
-          { "name": "estimatedDuration", "type": "i64" },
-          { "name": "createdAt", "type": "i64" },
-          { "name": "status", "type": { "defined": "BidStatus" } }
-        ]
-      }
-    }
-  ],
-  "types": [
-    {
-      "name": "TaskStatus",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          { "name": "Posted" },
-          { "name": "Bidding" },
-          { "name": "Assigned" },
-          { "name": "InProgress" },
-          { "name": "UnderReview" },
-          { "name": "Completed" },
-          { "name": "Disputed" },
-          { "name": "Resolved" },
-          { "name": "Cancelled" }
-        ]
-      }
-    },
-    {
-      "name": "BidStatus",
-      "type": {
-        "kind": "enum",
-        "variants": [
-          { "name": "Active" },
-          { "name": "Accepted" },
-          { "name": "Rejected" },
-          { "name": "Withdrawn" }
-        ]
-      }
-    }
-  ],
-  "errors": [
-    { "code": 6000, "name": "InvalidTaskId", "msg": "Task ID must be between 1 and 32 characters" },
-    { "code": 6001, "name": "InvalidTitle", "msg": "Title must be between 1 and 100 characters" },
-    { "code": 6002, "name": "InvalidDescription", "msg": "Description must not exceed 2000 characters" },
-    { "code": 6003, "name": "BudgetTooLow", "msg": "Budget must be at least 1 USDC" },
-    { "code": 6004, "name": "InvalidDeadline", "msg": "Deadline must be between 1 and 90 days from now" },
-    { "code": 6005, "name": "TooManySkills", "msg": "Cannot specify more than 10 skills" },
-    { "code": 6006, "name": "InvalidSkill", "msg": "Skill name must be between 1 and 50 characters" },
-    { "code": 6007, "name": "ArithmeticOverflow", "msg": "Arithmetic operation overflowed" },
-    { "code": 6008, "name": "TaskNotOpen", "msg": "Task is not open for bidding" },
-    { "code": 6009, "name": "BidTooHigh", "msg": "Bid cannot exceed task budget" },
-    { "code": 6010, "name": "DeadlinePassed", "msg": "Task deadline has passed" },
-    { "code": 6011, "name": "InsufficientReputation", "msg": "Insufficient reputation to bid" },
-    { "code": 6012, "name": "TaskNotAssigned", "msg": "Task is not assigned to this agent" },
-    { "code": 6013, "name": "NotTaskPoster", "msg": "Only the task poster can perform this action" },
-    { "code": 6014, "name": "NotAssignedAgent", "msg": "Only the assigned agent can perform this action" },
-    { "code": 6015, "name": "DisputeTimeout", "msg": "Dispute resolution timeout has passed" },
-    { "code": 6016, "name": "InvalidStatus", "msg": "Invalid task status for this operation" },
-    { "code": 6017, "name": "InsufficientFunds", "msg": "Insufficient funds for this operation" },
-    { "code": 6018, "name": "Unauthorized", "msg": "Unauthorized to perform this action" },
-    { "code": 6019, "name": "TransferFailed", "msg": "Token transfer failed" },
-    { "code": 6020, "name": "InvalidAmount", "msg": "Invalid amount specified" },
-    { "code": 6021, "name": "AlreadyCompleted", "msg": "Task has already been completed" },
-    { "code": 6022, "name": "AlreadyDisputed", "msg": "Task has already been disputed" },
-    { "code": 6023, "name": "DisputeNotFound", "msg": "Dispute not found for this task" }
-  ],
-  "metadata": {
-    "address": "4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6"
-  }
-};
-
 export function getConnection(): Connection {
   if (!connection) {
     const endpoint = NETWORK === 'mainnet' 
@@ -192,25 +50,6 @@ export function getConnection(): Connection {
     connection = new Connection(endpoint, 'confirmed');
   }
   return connection;
-}
-
-export function getProvider(): AnchorProvider {
-  if (!provider) {
-    const conn = getConnection();
-    const wallet = new NodeWallet(getFundedWallet());
-    provider = new AnchorProvider(conn, wallet, {
-      commitment: 'confirmed'
-    });
-  }
-  return provider;
-}
-
-export function getProgram(): Program {
-  if (!program) {
-    const prov = getProvider();
-    program = new Program(IDL as any, PROGRAM_ID, prov);
-  }
-  return program;
 }
 
 export async function getProgramState() {
@@ -244,28 +83,42 @@ export async function getProgramState() {
 
 // Get all tasks from the blockchain
 export async function getTasksFromChain(): Promise<any[]> {
-  try {
-    const prog = getProgram();
-    // @ts-ignore
-    const tasks = await prog.account.task.all();
-    
-    return tasks.map((t: any) => ({
-      id: t.account.taskId,
-      title: t.account.title,
-      description: t.account.description,
-      budget: t.account.budget.toNumber() / 1e6,
-      deadline: new Date(t.account.deadline.toNumber() * 1000).toISOString(),
-      requiredSkills: t.account.requiredSkills,
-      status: Object.keys(t.account.status)[0].toLowerCase(),
-      posterId: t.account.poster.toBase58(),
-      assignedAgent: t.account.assignedAgent?.toBase58() || null,
-      createdAt: new Date(t.account.createdAt.toNumber() * 1000).toISOString(),
-      onChain: true
-    }));
-  } catch (error: any) {
-    console.error('[Solana] Error fetching tasks:', error.message);
-    return [];
-  }
+  // For now, return empty array since we don't have Anchor to deserialize accounts
+  // This would require implementing account decoding manually
+  return [];
+}
+
+// Serialize string for borsh
+function serializeString(str: string): Buffer {
+  const strBuffer = Buffer.from(str, 'utf8');
+  const lenBuffer = Buffer.alloc(4);
+  lenBuffer.writeUInt32LE(strBuffer.length, 0);
+  return Buffer.concat([lenBuffer, strBuffer]);
+}
+
+// Serialize array of strings
+function serializeStringArray(arr: string[]): Buffer {
+  const lenBuffer = Buffer.alloc(4);
+  lenBuffer.writeUInt32LE(arr.length, 0);
+  
+  const items = arr.map(serializeString);
+  return Buffer.concat([lenBuffer, ...items]);
+}
+
+// Serialize u64 (as little-endian 8 bytes)
+function serializeU64(value: number): Buffer {
+  const buf = Buffer.alloc(8);
+  // Use BigInt for values > 2^53
+  const bigValue = BigInt.asUintN(64, BigInt(value));
+  buf.writeBigUInt64LE(bigValue, 0);
+  return buf;
+}
+
+// Serialize i64 (as little-endian 8 bytes)
+function serializeI64(value: number): Buffer {
+  const buf = Buffer.alloc(8);
+  buf.writeBigInt64LE(BigInt(value), 0);
+  return buf;
 }
 
 // Create task on blockchain with real transaction
@@ -280,8 +133,6 @@ export async function createTaskOnChain(
   try {
     const conn = getConnection();
     const wallet = getFundedWallet();
-    const prov = new AnchorProvider(conn, new NodeWallet(wallet), { commitment: 'confirmed' });
-    const prog = new Program(IDL as any, PROGRAM_ID, prov);
     
     // Derive PDA for task account
     const [taskPDA] = PublicKey.findProgramAddressSync(
@@ -306,31 +157,68 @@ export async function createTaskOnChain(
     console.log('[Solana] Budget:', budget, 'USDC');
     console.log('[Solana] Task PDA:', taskPDA.toBase58());
     
-    // Call program instruction
-    const tx = await prog.methods
-      .createTask(
-        taskId,
-        title,
-        description,
-        new BN(budget * 1e6),
-        new BN(Math.floor(deadline.getTime() / 1000)),
-        requiredSkills
-      )
-      .accounts({
-        task: taskPDA,
-        poster: wallet.publicKey,
-        posterTokenAccount: posterTokenAccount,
-        escrowAccount: escrowPDA,
-        tokenProgram: TOKEN_PROGRAM_ID,
-        systemProgram: SystemProgram.programId,
-      })
-      .rpc();
+    // Serialize instruction data manually
+    // discriminator + taskId + title + description + budget + deadline + requiredSkills
+    const taskIdData = serializeString(taskId);
+    const titleData = serializeString(title);
+    const descData = serializeString(description);
+    const budgetData = serializeU64(Math.floor(budget * 1e6)); // Convert to USDC lamports
+    const deadlineData = serializeI64(Math.floor(deadline.getTime() / 1000));
+    const skillsData = serializeStringArray(requiredSkills);
     
-    console.log('[Solana] Transaction successful:', tx);
+    const data = Buffer.concat([
+      CREATE_TASK_DISCRIMINATOR,
+      taskIdData,
+      titleData,
+      descData,
+      budgetData,
+      deadlineData,
+      skillsData
+    ]);
+    
+    // Build keys array matching Rust struct order:
+    // 1. task, 2. escrow_account, 3. poster, 4. poster_token_account, 5. usdc_mint, 6. token_program, 7. system_program, 8. rent
+    const keys = [
+      { pubkey: taskPDA, isSigner: false, isWritable: true },      // task
+      { pubkey: escrowPDA, isSigner: false, isWritable: true },    // escrow_account
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: true }, // poster
+      { pubkey: posterTokenAccount, isSigner: false, isWritable: true }, // poster_token_account
+      { pubkey: USDC_MINT_DEVNET, isSigner: false, isWritable: false }, // usdc_mint
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
+      { pubkey: RENT_SYSVAR, isSigner: false, isWritable: false }, // rent
+    ];
+    
+    // Create instruction
+    const instruction = new TransactionInstruction({
+      keys,
+      programId: PROGRAM_ID,
+      data,
+    });
+    
+    // Create and sign transaction
+    const transaction = new Transaction().add(instruction);
+    transaction.feePayer = wallet.publicKey;
+    
+    const { blockhash } = await conn.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
+    
+    transaction.sign(wallet);
+    
+    // Send transaction
+    const signature = await conn.sendRawTransaction(transaction.serialize(), {
+      skipPreflight: false,
+      preflightCommitment: 'confirmed',
+    });
+    
+    // Confirm transaction
+    await conn.confirmTransaction(signature, 'confirmed');
+    
+    console.log('[Solana] Transaction successful:', signature);
     
     return {
       success: true,
-      signature: tx
+      signature
     };
   } catch (error: any) {
     console.error('[Solana] Error creating task:', error);
@@ -342,12 +230,8 @@ export async function createTaskOnChain(
 }
 
 export async function getTaskCount(): Promise<number> {
-  try {
-    const tasks = await getTasksFromChain();
-    return tasks.length;
-  } catch (error) {
-    return 0;
-  }
+  const tasks = await getTasksFromChain();
+  return tasks.length;
 }
 
 export { PROGRAM_ID, NETWORK, USDC_MINT_DEVNET };
