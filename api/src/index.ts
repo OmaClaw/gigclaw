@@ -139,7 +139,7 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🦞 GigClaw API running on port ${PORT}`);
+  console.log(`🦞 GigClaw API v0.2.1 running on port ${PORT}`);
   console.log(`📚 API docs: https://raw.githubusercontent.com/OmaClaw/gigclaw/main/skill.md`);
   
   // Start background services
