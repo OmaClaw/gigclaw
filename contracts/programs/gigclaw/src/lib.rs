@@ -18,7 +18,7 @@ const REPUTATION_STAKE_RATIO: u64 = 10; // Stake 10% of bid amount as reputation
 // Dispute timeout
 const DISPUTE_RESOLUTION_TIMEOUT: i64 = 7 * 24 * 60 * 60; // 7 days
 
-declare_id!("4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6");
+declare_id!("4CEy2MLsPL5p9BqG2RsBJWoFGczp2WG5yaHGYv7HbCjg");
 
 #[program]
 pub mod gigclaw {

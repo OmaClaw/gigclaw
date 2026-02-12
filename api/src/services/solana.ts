@@ -1,4 +1,4 @@
-import { Connection, PublicKey, Keypair, clusterApiUrl, SystemProgram, Transaction, TransactionInstruction } from '@solana/web3.js';
+import { Connection, PublicKey, Keypair, clusterApiUrl, SystemProgram, Transaction, TransactionInstruction, sendAndConfirmTransaction } from '@solana/web3.js';
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import bs58 from 'bs58';
 import fs from 'fs';
@@ -7,35 +7,30 @@ import os from 'os';
 
 const PROGRAM_ID = new PublicKey('4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6');
 const NETWORK = process.env.SOLANA_NETWORK || 'devnet';
-const USDC_MINT_DEVNET = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU'); // Devnet USDC
+const USDC_MINT_DEVNET = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
 const RENT_SYSVAR = new PublicKey('SysvarRent111111111111111111111111111111111');
 
 let connection: Connection | null = null;
 let fundedWallet: Keypair | null = null;
 
-// Instruction discriminator for create_task (first 8 bytes of sha256("global:create_task"))
-const CREATE_TASK_DISCRIMINATOR = Buffer.from([0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab]);
-
-// Initialize funded wallet from environment or Solana CLI keypair file
+// Initialize funded wallet
 function getFundedWallet(): Keypair {
   if (!fundedWallet) {
     const privateKeyBase58 = process.env.SOLANA_PRIVATE_KEY;
     
     if (privateKeyBase58) {
-      // Use environment variable (Railway/production)
       const secretKey = bs58.decode(privateKeyBase58);
       fundedWallet = Keypair.fromSecretKey(secretKey);
-      console.log('[Solana] Loaded funded wallet from env:', fundedWallet.publicKey.toBase58());
+      console.log('[Solana] Loaded wallet from env:', fundedWallet.publicKey.toBase58());
     } else {
-      // Try to load from Solana CLI keypair file (local development)
       const solanaKeypairPath = path.join(os.homedir(), '.config', 'solana', 'id.json');
       if (fs.existsSync(solanaKeypairPath)) {
         const keypairJson = JSON.parse(fs.readFileSync(solanaKeypairPath, 'utf-8'));
         const secretKey = new Uint8Array(keypairJson);
         fundedWallet = Keypair.fromSecretKey(secretKey);
-        console.log('[Solana] Loaded funded wallet from file:', fundedWallet.publicKey.toBase58());
+        console.log('[Solana] Loaded wallet from file:', fundedWallet.publicKey.toBase58());
       } else {
-        throw new Error('SOLANA_PRIVATE_KEY not set and no Solana keypair found at ~/.config/solana/id.json');
+        throw new Error('SOLANA_PRIVATE_KEY not set');
       }
     }
   }
@@ -58,7 +53,7 @@ export async function getProgramState() {
     const accountInfo = await conn.getAccountInfo(PROGRAM_ID);
     
     if (!accountInfo) {
-      return { status: 'not_deployed', message: 'Program not found on chain' };
+      return { status: 'not_deployed', message: 'Program not found' };
     }
     
     const balance = await conn.getBalance(PROGRAM_ID);
@@ -73,55 +68,83 @@ export async function getProgramState() {
       dataSize: accountInfo.data.length
     };
   } catch (error: any) {
-    return { 
-      status: 'error', 
-      message: error.message,
-      network: NETWORK 
-    };
+    return { status: 'error', message: error.message, network: NETWORK };
   }
 }
 
-// Get all tasks from the blockchain
+// Get tasks from blockchain using raw account decoding
 export async function getTasksFromChain(): Promise<any[]> {
-  // For now, return empty array since we don't have Anchor to deserialize accounts
-  // This would require implementing account decoding manually
-  return [];
+  try {
+    const conn = getConnection();
+    
+    // Get all accounts owned by our program
+    const accounts = await conn.getProgramAccounts(PROGRAM_ID, {
+      commitment: 'confirmed',
+    });
+    
+    const tasks: any[] = [];
+    
+    for (const account of accounts) {
+      try {
+        // Decode account data manually
+        // Task account layout: discriminator(8) + task_id(string) + poster(32) + ...
+        const data = account.account.data;
+        
+        // Skip if too small
+        if (data.length < 100) continue;
+        
+        // Basic decoding (simplified)
+        let offset = 8; // Skip discriminator
+        
+        // Read task_id (string)
+        const taskIdLen = data.readUInt32LE(offset);
+        offset += 4;
+        const taskId = data.slice(offset, offset + taskIdLen).toString('utf8');
+        offset += taskIdLen;
+        
+        // Read poster pubkey (32 bytes)
+        const posterPubkey = new PublicKey(data.slice(offset, offset + 32));
+        offset += 32;
+        
+        // Read title (string)
+        const titleLen = data.readUInt32LE(offset);
+        offset += 4;
+        const title = data.slice(offset, offset + titleLen).toString('utf8');
+        offset += titleLen;
+        
+        // Read description (string)
+        const descLen = data.readUInt32LE(offset);
+        offset += 4;
+        const description = data.slice(offset, offset + descLen).toString('utf8');
+        offset += descLen;
+        
+        // Read budget (u64)
+        const budget = Number(data.readBigUInt64LE(offset)) / 1e6;
+        offset += 8;
+        
+        tasks.push({
+          id: taskId,
+          title,
+          description,
+          budget,
+          posterId: posterPubkey.toBase58(),
+          onChain: true,
+          account: account.pubkey.toBase58()
+        });
+      } catch (e) {
+        // Skip accounts that don't decode properly
+        continue;
+      }
+    }
+    
+    return tasks;
+  } catch (error: any) {
+    console.error('[Solana] Error fetching tasks:', error.message);
+    return [];
+  }
 }
 
-// Serialize string for borsh
-function serializeString(str: string): Buffer {
-  const strBuffer = Buffer.from(str, 'utf8');
-  const lenBuffer = Buffer.alloc(4);
-  lenBuffer.writeUInt32LE(strBuffer.length, 0);
-  return Buffer.concat([lenBuffer, strBuffer]);
-}
-
-// Serialize array of strings
-function serializeStringArray(arr: string[]): Buffer {
-  const lenBuffer = Buffer.alloc(4);
-  lenBuffer.writeUInt32LE(arr.length, 0);
-  
-  const items = arr.map(serializeString);
-  return Buffer.concat([lenBuffer, ...items]);
-}
-
-// Serialize u64 (as little-endian 8 bytes)
-function serializeU64(value: number): Buffer {
-  const buf = Buffer.alloc(8);
-  // Use BigInt for values > 2^53
-  const bigValue = BigInt.asUintN(64, BigInt(value));
-  buf.writeBigUInt64LE(bigValue, 0);
-  return buf;
-}
-
-// Serialize i64 (as little-endian 8 bytes)
-function serializeI64(value: number): Buffer {
-  const buf = Buffer.alloc(8);
-  buf.writeBigInt64LE(BigInt(value), 0);
-  return buf;
-}
-
-// Create task on blockchain with real transaction
+// Create task on blockchain - RAW IMPLEMENTATION (no Anchor)
 export async function createTaskOnChain(
   taskId: string,
   title: string,
@@ -133,6 +156,10 @@ export async function createTaskOnChain(
   try {
     const conn = getConnection();
     const wallet = getFundedWallet();
+    
+    console.log('[Solana] Creating task on chain...');
+    console.log('[Solana] Task ID:', taskId);
+    console.log('[Solana] Budget:', budget, 'USDC');
     
     // Derive PDA for task account
     const [taskPDA] = PublicKey.findProgramAddressSync(
@@ -152,41 +179,63 @@ export async function createTaskOnChain(
       wallet.publicKey
     );
     
-    console.log('[Solana] Creating task on chain...');
-    console.log('[Solana] Task ID:', taskId);
-    console.log('[Solana] Budget:', budget, 'USDC');
     console.log('[Solana] Task PDA:', taskPDA.toBase58());
+    console.log('[Solana] Escrow PDA:', escrowPDA.toBase58());
     
-    // Serialize instruction data manually
-    // discriminator + taskId + title + description + budget + deadline + requiredSkills
-    const taskIdData = serializeString(taskId);
-    const titleData = serializeString(title);
-    const descData = serializeString(description);
-    const budgetData = serializeU64(Math.floor(budget * 1e6)); // Convert to USDC lamports
-    const deadlineData = serializeI64(Math.floor(deadline.getTime() / 1000));
-    const skillsData = serializeStringArray(requiredSkills);
+    // Build instruction data manually
+    // Instruction discriminator for create_task (8 bytes)
+    // Using raw hash instead of Anchor's derived one
+    const discriminator = Buffer.from([0xc2, 0x50, 0x06, 0xb4, 0xe8, 0x7f, 0x30, 0xab]);
+    
+    // Serialize arguments
+    const taskIdBytes = Buffer.from(taskId, 'utf8');
+    const taskIdLen = Buffer.alloc(4);
+    taskIdLen.writeUInt32LE(taskIdBytes.length, 0);
+    
+    const titleBytes = Buffer.from(title, 'utf8');
+    const titleLen = Buffer.alloc(4);
+    titleLen.writeUInt32LE(titleBytes.length, 0);
+    
+    const descBytes = Buffer.from(description, 'utf8');
+    const descLen = Buffer.alloc(4);
+    descLen.writeUInt32LE(descBytes.length, 0);
+    
+    const budgetBuf = Buffer.alloc(8);
+    budgetBuf.writeBigUInt64LE(BigInt(Math.floor(budget * 1e6)), 0);
+    
+    const deadlineBuf = Buffer.alloc(8);
+    deadlineBuf.writeBigInt64LE(BigInt(Math.floor(deadline.getTime() / 1000)), 0);
+    
+    // Serialize skills array
+    const skillsLen = Buffer.alloc(4);
+    skillsLen.writeUInt32LE(requiredSkills.length, 0);
+    const skillsBytes = Buffer.concat(requiredSkills.map(skill => {
+      const s = Buffer.from(skill, 'utf8');
+      const l = Buffer.alloc(4);
+      l.writeUInt32LE(s.length, 0);
+      return Buffer.concat([l, s]);
+    }));
     
     const data = Buffer.concat([
-      CREATE_TASK_DISCRIMINATOR,
-      taskIdData,
-      titleData,
-      descData,
-      budgetData,
-      deadlineData,
-      skillsData
+      discriminator,
+      taskIdLen, taskIdBytes,
+      titleLen, titleBytes,
+      descLen, descBytes,
+      budgetBuf,
+      deadlineBuf,
+      skillsLen, skillsBytes
     ]);
     
-    // Build keys array matching Rust struct order:
-    // 1. task, 2. escrow_account, 3. poster, 4. poster_token_account, 5. usdc_mint, 6. token_program, 7. system_program, 8. rent
+    // Build account metas (order matters!)
     const keys = [
-      { pubkey: taskPDA, isSigner: false, isWritable: true },      // task
-      { pubkey: escrowPDA, isSigner: false, isWritable: true },    // escrow_account
-      { pubkey: wallet.publicKey, isSigner: true, isWritable: true }, // poster
-      { pubkey: posterTokenAccount, isSigner: false, isWritable: true }, // poster_token_account
-      { pubkey: USDC_MINT_DEVNET, isSigner: false, isWritable: false }, // usdc_mint
-      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false }, // token_program
-      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false }, // system_program
-      { pubkey: RENT_SYSVAR, isSigner: false, isWritable: false }, // rent
+      { pubkey: taskPDA, isSigner: false, isWritable: true },
+      { pubkey: escrowPDA, isSigner: false, isWritable: true },
+      { pubkey: wallet.publicKey, isSigner: true, isWritable: true },
+      { pubkey: posterTokenAccount, isSigner: false, isWritable: true },
+      { pubkey: USDC_MINT_DEVNET, isSigner: false, isWritable: false },
+      { pubkey: TOKEN_PROGRAM_ID, isSigner: false, isWritable: false },
+      { pubkey: SystemProgram.programId, isSigner: false, isWritable: false },
+      { pubkey: RENT_SYSVAR, isSigner: false, isWritable: false },
     ];
     
     // Create instruction
@@ -196,32 +245,37 @@ export async function createTaskOnChain(
       data,
     });
     
-    // Create and sign transaction
+    // Build and send transaction
     const transaction = new Transaction().add(instruction);
+    
+    // Get recent blockhash
+    const { blockhash, lastValidBlockHeight } = await conn.getLatestBlockhash();
+    transaction.recentBlockhash = blockhash;
     transaction.feePayer = wallet.publicKey;
     
-    const { blockhash } = await conn.getLatestBlockhash();
-    transaction.recentBlockhash = blockhash;
-    
+    // Sign and send
     transaction.sign(wallet);
     
-    // Send transaction
-    const signature = await conn.sendRawTransaction(transaction.serialize(), {
-      skipPreflight: false,
-      preflightCommitment: 'confirmed',
-    });
+    console.log('[Solana] Sending transaction...');
     
-    // Confirm transaction
-    await conn.confirmTransaction(signature, 'confirmed');
+    const signature = await sendAndConfirmTransaction(
+      conn,
+      transaction,
+      [wallet],
+      {
+        commitment: 'confirmed',
+        maxRetries: 3,
+      }
+    );
     
-    console.log('[Solana] Transaction successful:', signature);
+    console.log('[Solana] ✅ Transaction successful:', signature);
     
     return {
       success: true,
       signature
     };
   } catch (error: any) {
-    console.error('[Solana] Error creating task:', error);
+    console.error('[Solana] ❌ Error creating task:', error.message);
     return {
       success: false,
       error: error.message

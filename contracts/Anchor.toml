@@ -3,10 +3,10 @@ seeds = false
 skip-lint = false
 
 [programs.localnet]
-gigclaw = "4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6"
+gigclaw = "4CEy2MLsPL5p9BqG2RsBJWoFGczp2WG5yaHGYv7HbCjg"
 
 [programs.devnet]
-gigclaw = "4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6"
+gigclaw = "4CEy2MLsPL5p9BqG2RsBJWoFGczp2WG5yaHGYv7HbCjg"
 
 [registry]
 url = "https://api.apr.dev"
