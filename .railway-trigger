@@ -1,5 +1,1 @@
-# Railway Deployment Trigger
-# This file triggers a new Railway deployment when changed
-
-Build Trigger: 2026-02-09T23:45:00Z
-Commit: 384989c
+Trigger redeploy
