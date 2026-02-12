@@ -5,7 +5,7 @@ import fs from 'fs';
 import path from 'path';
 import os from 'os';
 
-const PROGRAM_ID = new PublicKey('4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6');
+const PROGRAM_ID = new PublicKey('4CEy2MLsPL5p9BqG2RsBJWoFGczp2WG5yaHGYv7HbCjg');
 const NETWORK = process.env.SOLANA_NETWORK || 'devnet';
 const USDC_MINT_DEVNET = new PublicKey('4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU');
 const RENT_SYSVAR = new PublicKey('SysvarRent111111111111111111111111111111111');
