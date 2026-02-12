@@ -1,9 +1,9 @@
 import { Router, Request, Response, NextFunction } from 'express';
-import { v4 as uuidv4 } from 'uuid';
 import { createTaskValidation, bidValidation, taskIdValidation } from '../middleware/validation';
 import { triggerWebhook } from '../routes/webhooks';
 import { AppError } from '../middleware/errorHandler';
 import { getTasksFromChain, createTaskOnChain } from '../services/solana';
+import crypto from 'crypto';
 
 // In-memory store (fallback when Solana unavailable)
 const tasks = new Map<string, any>();
@@ -72,7 +72,8 @@ taskRouter.post('/', createTaskValidation, async (req: Request, res: Response, n
   try {
     const { title, description, budget, deadline, requiredSkills, posterId } = req.body;
     
-    const taskId = uuidv4();
+    // Generate short task ID (max 16 chars for Solana PDA seeds)
+    const taskId = `task${Date.now().toString(36).slice(-8)}${Math.random().toString(36).slice(2, 6)}`;
     const task: any = {
       id: taskId,
       title,
@@ -169,7 +170,7 @@ taskRouter.post('/:id/bid', (req, res) => {
   const { agentId, amount, estimatedDuration } = req.body;
   
   const bid = {
-    id: uuidv4(),
+    id: `bid${Date.now().toString(36).slice(-6)}${Math.random().toString(36).slice(2, 5)}`,
     agentId,
     amount,
     estimatedDuration,

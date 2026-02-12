@@ -2,6 +2,10 @@ import { Connection, PublicKey, Keypair, clusterApiUrl, SystemProgram } from '@s
 import { getAssociatedTokenAddress, TOKEN_PROGRAM_ID } from '@solana/spl-token';
 import { Program, AnchorProvider, BN } from '@coral-xyz/anchor';
 import NodeWallet from '@coral-xyz/anchor/dist/cjs/nodewallet';
+import bs58 from 'bs58';
+import fs from 'fs';
+import path from 'path';
+import os from 'os';
 
 const PROGRAM_ID = new PublicKey('4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6');
 const NETWORK = process.env.SOLANA_NETWORK || 'devnet';
@@ -12,18 +16,28 @@ let provider: AnchorProvider | null = null;
 let program: any = null;
 let fundedWallet: Keypair | null = null;
 
-// Initialize funded wallet from environment
+// Initialize funded wallet from environment or Solana CLI keypair file
 function getFundedWallet(): Keypair {
   if (!fundedWallet) {
     const privateKeyBase58 = process.env.SOLANA_PRIVATE_KEY;
-    if (!privateKeyBase58) {
-      throw new Error('SOLANA_PRIVATE_KEY not set in environment');
-    }
     
-    // Decode base58 private key
-    const secretKey = Buffer.from(require('bs58').decode(privateKeyBase58));
-    fundedWallet = Keypair.fromSecretKey(secretKey);
-    console.log('[Solana] Loaded funded wallet:', fundedWallet.publicKey.toBase58());
+    if (privateKeyBase58) {
+      // Use environment variable (Railway/production)
+      const secretKey = bs58.decode(privateKeyBase58);
+      fundedWallet = Keypair.fromSecretKey(secretKey);
+      console.log('[Solana] Loaded funded wallet from env:', fundedWallet.publicKey.toBase58());
+    } else {
+      // Try to load from Solana CLI keypair file (local development)
+      const solanaKeypairPath = path.join(os.homedir(), '.config', 'solana', 'id.json');
+      if (fs.existsSync(solanaKeypairPath)) {
+        const keypairJson = JSON.parse(fs.readFileSync(solanaKeypairPath, 'utf-8'));
+        const secretKey = new Uint8Array(keypairJson);
+        fundedWallet = Keypair.fromSecretKey(secretKey);
+        console.log('[Solana] Loaded funded wallet from file:', fundedWallet.publicKey.toBase58());
+      } else {
+        throw new Error('SOLANA_PRIVATE_KEY not set and no Solana keypair found at ~/.config/solana/id.json');
+      }
+    }
   }
   return fundedWallet;
 }
@@ -164,7 +178,10 @@ const IDL = {
     { "code": 6021, "name": "AlreadyCompleted", "msg": "Task has already been completed" },
     { "code": 6022, "name": "AlreadyDisputed", "msg": "Task has already been disputed" },
     { "code": 6023, "name": "DisputeNotFound", "msg": "Dispute not found for this task" }
-  ]
+  ],
+  "metadata": {
+    "address": "4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6"
+  }
 };
 
 export function getConnection(): Connection {
