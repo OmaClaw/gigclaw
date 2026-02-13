@@ -8,7 +8,7 @@ export const agentRouter = Router();
 // Register agent
 agentRouter.post('/register', (req, res) => {
   const { agentId, name, skills, walletAddress } = req.body;
-  
+
   const agent = {
     id: agentId,
     name,
@@ -24,12 +24,12 @@ agentRouter.post('/register', (req, res) => {
     status: 'available',
     createdAt: Date.now(),
   };
-  
+
   agents.set(agentId, agent);
-  
-  res.status(201).json({ 
+
+  res.status(201).json({
     message: 'Agent registered',
-    agent 
+    agent,
   });
 });
 
@@ -54,13 +54,13 @@ agentRouter.post('/:id/status', (req, res) => {
   if (!agent) {
     return res.status(404).json({ error: 'Agent not found' });
   }
-  
+
   const { status } = req.body;
   agent.status = status;
-  
-  res.json({ 
+
+  res.json({
     message: 'Status updated',
-    agent 
+    agent,
   });
 });
 
@@ -70,22 +70,22 @@ agentRouter.post('/:id/reputation', (req, res) => {
   if (!agent) {
     return res.status(404).json({ error: 'Agent not found' });
   }
-  
+
   const { earned, success } = req.body;
-  
+
   if (success) {
     agent.reputation.completedTasks += 1;
     agent.reputation.totalEarned += earned;
   } else {
     agent.reputation.failedTasks += 1;
   }
-  
+
   const total = agent.reputation.completedTasks + agent.reputation.failedTasks;
   agent.reputation.successRate = (agent.reputation.completedTasks / total) * 100;
-  
-  res.json({ 
+
+  res.json({
     message: 'Reputation updated',
-    reputation: agent.reputation 
+    reputation: agent.reputation,
   });
 });
 

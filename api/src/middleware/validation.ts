@@ -7,7 +7,7 @@ export const validate = (req: Request, res: Response, next: NextFunction) => {
   if (!errors.isEmpty()) {
     return res.status(400).json({
       error: 'Validation failed',
-      details: errors.array()
+      details: errors.array(),
     });
   }
   next();
@@ -15,10 +15,7 @@ export const validate = (req: Request, res: Response, next: NextFunction) => {
 
 // Task validation rules
 export const createTaskValidation = [
-  body('title')
-    .trim()
-    .isLength({ min: 5, max: 200 })
-    .withMessage('Title must be 5-200 characters'),
+  body('title').trim().isLength({ min: 5, max: 200 }).withMessage('Title must be 5-200 characters'),
   body('description')
     .trim()
     .isLength({ min: 20, max: 5000 })
@@ -26,9 +23,7 @@ export const createTaskValidation = [
   body('budget')
     .isFloat({ min: 0.01, max: 10000 })
     .withMessage('Budget must be between 0.01 and 10000 USDC'),
-  body('deadline')
-    .isISO8601()
-    .withMessage('Deadline must be valid ISO8601 date'),
+  body('deadline').isISO8601().withMessage('Deadline must be valid ISO8601 date'),
   body('requiredSkills')
     .isArray({ min: 1, max: 10 })
     .withMessage('Must specify 1-10 required skills'),
@@ -36,32 +31,21 @@ export const createTaskValidation = [
     .trim()
     .isLength({ min: 2, max: 50 })
     .withMessage('Each skill must be 2-50 characters'),
-  body('posterId')
-    .trim()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Poster ID required'),
-  validate
+  body('posterId').trim().isLength({ min: 1, max: 100 }).withMessage('Poster ID required'),
+  validate,
 ];
 
 export const bidValidation = [
   param('id').isUUID().withMessage('Invalid task ID'),
-  body('agentId')
-    .trim()
-    .isLength({ min: 1, max: 100 })
-    .withMessage('Agent ID required'),
-  body('amount')
-    .isFloat({ min: 0.01 })
-    .withMessage('Bid amount must be positive'),
+  body('agentId').trim().isLength({ min: 1, max: 100 }).withMessage('Agent ID required'),
+  body('amount').isFloat({ min: 0.01 }).withMessage('Bid amount must be positive'),
   body('estimatedDuration')
     .isInt({ min: 60, max: 2592000 }) // 1 min to 30 days
     .withMessage('Duration must be 1 min to 30 days (in seconds)'),
-  validate
+  validate,
 ];
 
-export const taskIdValidation = [
-  param('id').isUUID().withMessage('Invalid task ID'),
-  validate
-];
+export const taskIdValidation = [param('id').isUUID().withMessage('Invalid task ID'), validate];
 
 // Sanitize input to prevent XSS
 export const sanitizeInput = (req: Request, res: Response, next: NextFunction) => {

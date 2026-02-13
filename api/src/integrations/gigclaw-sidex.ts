@@ -1,8 +1,8 @@
 /**
  * GigClaw + SIDEX Integration (Simplified for Production)
- * 
+ *
  * Enables agents to execute trading tasks through SIDEX
- * 
+ *
  * Status: Working implementation ready for deployment
  */
 
@@ -54,7 +54,7 @@ export class GigClawSIDEXIntegration {
 
     try {
       console.log(`[SIDEX] Executing task ${task.taskId}`);
-      
+
       // Simulate execution
       await new Promise(resolve => setTimeout(resolve, 100));
 
@@ -64,7 +64,7 @@ export class GigClawSIDEXIntegration {
         trades: [{ pair: task.pair, side: 'buy', amount: task.parameters.positionSize }],
         pnl: Math.random() * 10 - 2,
         executionTime: Date.now() - startTime,
-        status: 'completed'
+        status: 'completed',
       };
     } catch (error: any) {
       return {
@@ -73,7 +73,7 @@ export class GigClawSIDEXIntegration {
         trades: [],
         pnl: 0,
         executionTime: Date.now() - startTime,
-        status: 'failed'
+        status: 'failed',
       };
     } finally {
       this.isExecuting = false;
@@ -87,6 +87,6 @@ export async function registerSIDEXExecutor(
 ): Promise<{ success: boolean; serviceId?: string; error?: string }> {
   return {
     success: true,
-    serviceId: `sidex-${config.agentId}-${Date.now()}`
+    serviceId: `sidex-${config.agentId}-${Date.now()}`,
   };
 }

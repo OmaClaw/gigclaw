@@ -1,6 +1,6 @@
 /**
  * SIDEX Integration Adapter (Simplified)
- * 
+ *
  * Status: Working implementation for production
  */
 
@@ -51,6 +51,6 @@ export async function registerSIDEXService(
 ): Promise<{ success: boolean; serviceId?: string; error?: string }> {
   return {
     success: true,
-    serviceId: `sidex-${registration.agentId}-${Date.now()}`
+    serviceId: `sidex-${registration.agentId}-${Date.now()}`,
   };
 }

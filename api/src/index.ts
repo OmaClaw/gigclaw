@@ -38,8 +38,8 @@ const limiter = rateLimit({
   windowMs: 15 * 60 * 1000, // 15 minutes
   max: 100, // limit each IP to 100 requests per windowMs
   message: {
-    error: 'Too many requests, please try again later'
-  }
+    error: 'Too many requests, please try again later',
+  },
 });
 app.use(limiter);
 
@@ -48,8 +48,8 @@ const taskCreationLimiter = rateLimit({
   windowMs: 60 * 60 * 1000, // 1 hour
   max: 10, // 10 tasks per hour per IP
   message: {
-    error: 'Task creation limit reached (10 per hour)'
-  }
+    error: 'Task creation limit reached (10 per hour)',
+  },
 });
 app.use('/api/tasks', taskCreationLimiter);
 
@@ -69,13 +69,13 @@ app.use('/api/blockchain', blockchainRouter);
 
 // Health check with more details
 app.get('/health', (req, res) => {
-  res.json({ 
-    status: 'ok', 
+  res.json({
+    status: 'ok',
     timestamp: new Date().toISOString(),
     service: 'GigClaw API',
     version: '0.1.0',
     uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development'
+    environment: process.env.NODE_ENV || 'development',
   });
 });
 
@@ -99,7 +99,7 @@ app.get('/', (req, res) => {
       predictive: '/api/predictive',
       blockchain: '/api/blockchain',
       health: '/health',
-      stats: '/stats'
+      stats: '/stats',
     },
     features: [
       'Task marketplace with USDC escrow',
@@ -111,10 +111,10 @@ app.get('/', (req, res) => {
       'Skill evolution system',
       'Autonomous negotiation',
       'Predictive matching AI',
-      'Self-improvement suggestions'
+      'Self-improvement suggestions',
     ],
     documentation: 'https://raw.githubusercontent.com/OmaClaw/gigclaw/main/skill.md',
-    program: '9bV8oV5f7eaQw6iRdePgaX8jTmCnMAAt4gePqivZ6v91'
+    program: '9bV8oV5f7eaQw6iRdePgaX8jTmCnMAAt4gePqivZ6v91',
   });
 });
 
@@ -127,7 +127,7 @@ app.get('/stats', (req, res) => {
     bids: 0,
     status: 'operational',
     timestamp: new Date().toISOString(),
-    note: 'Stats tracking coming soon'
+    note: 'Stats tracking coming soon',
   });
 });
 
@@ -141,7 +141,7 @@ app.use(errorHandler);
 app.listen(PORT, () => {
   console.log(`🦞 GigClaw API v0.3.0 running on port ${PORT}`);
   console.log(`📚 API docs: https://raw.githubusercontent.com/OmaClaw/gigclaw/main/skill.md`);
-  
+
   // Start background services
   startTaskExpiryChecker();
 });
