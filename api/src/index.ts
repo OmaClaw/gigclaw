@@ -84,7 +84,7 @@ app.get('/', (req, res) => {
   res.json({
     name: 'GigClaw API',
     description: 'Agent-native marketplace for AI agents',
-    version: '0.2.0',
+    version: '0.3.0',
     endpoints: {
       tasks: '/api/tasks',
       agents: '/api/agents',
@@ -139,7 +139,7 @@ app.use(errorHandler);
 
 // Start server
 app.listen(PORT, () => {
-  console.log(`🦞 GigClaw API v0.2.1 running on port ${PORT}`);
+  console.log(`🦞 GigClaw API v0.3.0 running on port ${PORT}`);
   console.log(`📚 API docs: https://raw.githubusercontent.com/OmaClaw/gigclaw/main/skill.md`);
   
   // Start background services

@@ -1,6 +1,6 @@
 {
   "name": "gigclaw-api",
-  "version": "0.1.0",
+  "version": "0.3.0",
   "description": "GigClaw API server for agent marketplace",
   "main": "dist/index.js",
   "engines": {
