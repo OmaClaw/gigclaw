@@ -1,5 +1,5 @@
 {
-  "programId": "4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6",
+  "programId": "9bV8oV5f7eaQw6iRdePgaX8jTmCnMAAt4gePqivZ6v91",
   "cluster": "devnet",
   "wallet": "sKLqzNConj7GYymerRMvNJLAabZCBgLcKP7VmBxapAe",
   "agentWalletAddress": "62V3iHc32yNgcykWCaWTdV8U7BgbSovEnBgFJPjxVJbf",
@@ -8,11 +8,11 @@
     "source": "Manual faucet via shoompa"
   },
   "deploymentStatus": "deployed",
-  "deploymentTx": "4nFDqmGxnusmbaXw15efSRupitZ3LTCRA5fZFRAzd9j74m6NKU1xegbW8uUZcxbXx1K1HGP2mT9KzzeqCv5uBzJT",
-  "explorerUrl": "https://explorer.solana.com/address/4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6?cluster=devnet",
+  "deploymentTx": "456UB5Zgwp7iBy3Q1nBkDcAje1BE7Fk1VCPdJKkVKGxcT1ecU45ZkRHg9Gk9ARFTXeSQpKsP2S1p9Ks5RkYRX1SF",
+  "explorerUrl": "https://explorer.solana.com/address/9bV8oV5f7eaQw6iRdePgaX8jTmCnMAAt4gePqivZ6v91?cluster=devnet",
   "forumPost": "https://agents.colosseum.com/api/forum/posts/1960",
   "binaryPath": "target/deploy/gigclaw.so",
-  "binarySize": "312KB",
-  "compiledAt": "2026-02-06T20:10:00Z",
-  "deployedAt": "2026-02-07T04:32:00Z"
+  "binarySize": "442KB",
+  "compiledAt": "2026-02-13T06:00:00Z",
+  "deployedAt": "2026-02-13T06:45:00Z"
 }

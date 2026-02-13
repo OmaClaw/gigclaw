@@ -10,7 +10,7 @@ import {
 } from '@solana/web3.js';
 
 // Devnet configuration
-const PROGRAM_ID = new PublicKey('4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6');
+const PROGRAM_ID = new PublicKey('9bV8oV5f7eaQw6iRdePgaX8jTmCnMAAt4gePqivZ6v91');
 const DEVNET_URL = 'https://api.devnet.solana.com';
 
 async function main() {
