@@ -15,6 +15,7 @@ import { skillsRouter } from './routes/skills';
 import { negotiationRouter } from './routes/negotiations';
 import { predictiveRouter } from './routes/predictive';
 import { blockchainRouter } from './routes/blockchain';
+import { healthRouter } from './routes/health';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput } from './middleware/validation';
 import { startTaskExpiryChecker } from './services/taskExpiry';
@@ -66,18 +67,7 @@ app.use('/api/skills', skillsRouter);
 app.use('/api/negotiations', negotiationRouter);
 app.use('/api/predictive', predictiveRouter);
 app.use('/api/blockchain', blockchainRouter);
-
-// Health check with more details
-app.get('/health', (req, res) => {
-  res.json({
-    status: 'ok',
-    timestamp: new Date().toISOString(),
-    service: 'GigClaw API',
-    version: '0.1.0',
-    uptime: process.uptime(),
-    environment: process.env.NODE_ENV || 'development',
-  });
-});
+app.use('/health', healthRouter);
 
 // Root
 app.get('/', (req, res) => {
