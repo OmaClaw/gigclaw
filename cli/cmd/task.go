@@ -78,6 +78,17 @@ func init() {
 
 
 func runTaskList(cmd *cobra.Command, args []string) error {
+	// Check connectivity first
+	client, err := getAPIClient()
+	if err != nil {
+		return HandleAPIError(err)
+	}
+
+	// Pre-flight connectivity check
+	if err := client.CheckConnectivity(); err != nil {
+		return err
+	}
+
 	// Show loading spinner
 	bar := progressbar.NewOptions(1,
 		progressbar.OptionSetDescription("Fetching tasks..."),
@@ -87,16 +98,11 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 	)
 	bar.Add(1)
 
-	client, err := getAPIClient()
-	if err != nil {
-		return err
-	}
-
 	tasks, err := client.ListTasks()
 	bar.Finish()
 	
 	if err != nil {
-		return fmt.Errorf("%s failed to list tasks: %w", colorError.Sprint("✗"), err)
+		return err // Already handled by HandleAPIError
 	}
 
 	// Print header
@@ -120,6 +126,19 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 	colorLabel.Printf("  Found ")
 	colorHighlight.Printf("%d", len(tasks))
 	colorLabel.Println(" task(s)")
+	
+	// Count blockchain tasks
+	var blockchainCount int
+	for _, t := range tasks {
+		if t.BlockchainStatus != nil && t.BlockchainStatus.Status == "confirmed" {
+			blockchainCount++
+		}
+	}
+	if blockchainCount > 0 {
+		colorLabel.Printf("  ")
+		color.New(color.FgGreen).Printf("● %d on-chain", blockchainCount)
+		colorLabel.Println()
+	}
 	fmt.Println()
 
 	// Create and print table using tabwriter
@@ -130,12 +149,19 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 		color.New(color.FgHiWhite, color.Bold).Sprint("TITLE") + "\t" +
 		color.New(color.FgHiWhite, color.Bold).Sprint("BUDGET") + "\t" +
 		color.New(color.FgHiWhite, color.Bold).Sprint("STATUS") + "\t" +
-		color.New(color.FgHiWhite, color.Bold).Sprint("TAGS"))
+		color.New(color.FgHiWhite, color.Bold).Sprint("CHAIN"))
 	
 	for _, task := range tasks {
-		tags := strings.Join(task.Tags, ", ")
-		if tags == "" {
-			tags = colorDim.Sprint("-")
+		chainStatus := colorDim.Sprint("-")
+		if task.BlockchainStatus != nil {
+			switch task.BlockchainStatus.Status {
+			case "confirmed":
+				chainStatus = color.New(color.FgGreen).Sprint("✓")
+			case "pending":
+				chainStatus = color.New(color.FgYellow).Sprint("⋯")
+			case "failed":
+				chainStatus = color.New(color.FgRed).Sprint("✗")
+			}
 		}
 		
 		fmt.Fprintf(w, "%s\t%s\t%s\t%s\t%s\n",
@@ -143,11 +169,15 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 			colorValue.Sprint(truncate(task.Title, 35)),
 			colorPrimary.Sprintf("%.2f %s", task.Budget, task.Currency),
 			formatStatus(task.Status),
-			tags,
+			chainStatus,
 		)
 	}
 
 	w.Flush()
+	fmt.Println()
+	
+	// Legend
+	colorDim.Println("  Chain: ✓=on-chain  ⋯=pending  ✗=failed  -=memory")
 	fmt.Println()
 	
 	// Help footer
@@ -160,6 +190,17 @@ func runTaskList(cmd *cobra.Command, args []string) error {
 }
 
 func runTaskPost(cmd *cobra.Command, args []string) error {
+	// Check connectivity first
+	client, err := getAPIClient()
+	if err != nil {
+		return HandleAPIError(err)
+	}
+
+	// Pre-flight connectivity check
+	if err := client.CheckConnectivity(); err != nil {
+		return err
+	}
+
 	// Show progress
 	bar := progressbar.NewOptions(3,
 		progressbar.OptionSetDescription("Creating task..."),
@@ -173,18 +214,13 @@ func runTaskPost(cmd *cobra.Command, args []string) error {
 			BarEnd:        "[dim]╟[reset]",
 		}),
 	)
-
-	client, err := getAPIClient()
-	if err != nil {
-		return err
-	}
 	bar.Add(1)
 
-	task, err := client.CreateTask(taskTitle, taskDescription, taskBudget, taskCurrency, taskTags)
+	task, blockchain, err := client.CreateTask(taskTitle, taskDescription, taskBudget, taskCurrency, taskTags)
 	bar.Add(2)
 	
 	if err != nil {
-		return fmt.Errorf("%s failed to create task: %w", colorError.Sprint("✗"), err)
+		return err // Already handled by HandleAPIError
 	}
 	bar.Finish()
 
@@ -207,7 +243,30 @@ func runTaskPost(cmd *cobra.Command, args []string) error {
 	colorLabel.Printf("  %-15s ", "Status:")
 	fmt.Println(formatStatus(task.Status))
 	
+	// Show blockchain status if available
+	if blockchain != nil {
+		fmt.Println()
+		colorLabel.Printf("  %-15s ", "Blockchain:")
+		switch blockchain.Status {
+		case "confirmed":
+			color.New(color.FgGreen, color.Bold).Printf("✓ CONFIRMED\n")
+			colorLabel.Printf("  %-15s ", "Signature:")
+			colorDim.Println(truncate(blockchain.Signature, 40))
+			colorLabel.Printf("  %-15s ", "Explorer:")
+			color.New(color.FgCyan).Println("https://explorer.solana.com/tx/" + blockchain.Signature + "?cluster=devnet")
+		case "pending":
+			color.New(color.FgYellow).Printf("⧖ PENDING\n")
+		case "failed":
+			color.New(color.FgRed, color.Bold).Printf("✗ FAILED\n")
+			if blockchain.Error != "" {
+				colorLabel.Printf("  %-15s ", "Error:")
+				color.New(color.FgRed).Println(blockchain.Error)
+			}
+		}
+	}
+	
 	if len(task.Tags) > 0 {
+		fmt.Println()
 		colorLabel.Printf("  %-15s ", "Tags:")
 		for i, tag := range task.Tags {
 			if i > 0 {
