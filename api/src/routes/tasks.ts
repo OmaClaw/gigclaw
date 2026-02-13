@@ -2,6 +2,8 @@ import { Router, Request, Response, NextFunction } from 'express';
 import { createTaskValidation } from '../middleware/validation';
 import { triggerWebhook } from '../routes/webhooks';
 import { getTasksFromChain, createTaskOnChain } from '../services/solana';
+import { wsService } from '../services/websocket';
+import logger from '../utils/logger';
 
 // In-memory store (fallback when Solana unavailable)
 const tasks = new Map<string, any>();
@@ -93,6 +95,10 @@ taskRouter.post(
       };
 
       tasks.set(taskId, task);
+
+      // Broadcast to WebSocket clients
+      wsService.broadcastTaskCreated(task);
+      logger.info('Task created and broadcasted', { taskId, posterId });
 
       // Trigger webhook
       triggerWebhook('task.created', {

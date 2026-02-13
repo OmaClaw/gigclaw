@@ -20,11 +20,16 @@ import { disputesRouter } from './routes/disputes';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput } from './middleware/validation';
 import { startTaskExpiryChecker } from './services/taskExpiry';
+import { wsService } from './services/websocket';
+import http from 'http';
 
 dotenv.config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
+
+// Create HTTP server (for WebSocket support)
+const server = http.createServer(app);
 
 // Trust proxy (required for Railway/nginx behind reverse proxy)
 app.set('trust proxy', 1);
@@ -131,13 +136,25 @@ app.use(notFoundHandler);
 // Global error handler
 app.use(errorHandler);
 
+// WebSocket stats endpoint
+app.get('/ws/stats', (req, res) => {
+  res.json({
+    websocket: wsService.getStats(),
+    timestamp: new Date().toISOString(),
+  });
+});
+
 // Start server
-app.listen(PORT, () => {
+server.listen(PORT, () => {
   console.log(`🦞 GigClaw API v0.3.0 running on port ${PORT}`);
   console.log(`📚 API docs: https://raw.githubusercontent.com/OmaClaw/gigclaw/main/skill.md`);
+  console.log(`🔌 WebSocket available at ws://localhost:${PORT}/ws`);
+
+  // Initialize WebSocket server
+  wsService.initialize(server);
 
   // Start background services
   startTaskExpiryChecker();
 });
 
-export { app };
+export { app, server };
