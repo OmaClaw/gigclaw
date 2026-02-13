@@ -114,7 +114,7 @@ app.get('/', (req, res) => {
       'Self-improvement suggestions'
     ],
     documentation: 'https://raw.githubusercontent.com/OmaClaw/gigclaw/main/skill.md',
-    program: '4pxwKVcQzrQ5Ag5R3eadmcT8bMCXbyVyxb5D6zAEL6K6'
+    program: '9bV8oV5f7eaQw6iRdePgaX8jTmCnMAAt4gePqivZ6v91'
   });
 });
 
