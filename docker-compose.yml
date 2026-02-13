@@ -1,0 +1,47 @@
+version: '3.8'
+
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    ports:
+      - "8080:8080"
+    environment:
+      - NODE_ENV=production
+      - PORT=8080
+      - DATABASE_URL=${DATABASE_URL}
+      - SOLANA_NETWORK=${SOLANA_NETWORK:-devnet}
+      - SOLANA_PRIVATE_KEY=${SOLANA_PRIVATE_KEY}
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+    networks:
+      - gigclaw-network
+
+  # Optional: Add PostgreSQL for local development
+  db:
+    image: postgres:15-alpine
+    environment:
+      - POSTGRES_USER=gigclaw
+      - POSTGRES_PASSWORD=${DB_PASSWORD:-gigclaw}
+      - POSTGRES_DB=gigclaw
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    networks:
+      - gigclaw-network
+    profiles:
+      - with-db
+
+networks:
+  gigclaw-network:
+    driver: bridge
+
+volumes:
+  postgres_data:
