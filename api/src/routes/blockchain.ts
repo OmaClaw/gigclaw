@@ -18,8 +18,8 @@ blockchainRouter.get('/status', async (req, res) => {
     res.json({
       ...state,
       onChainTasks: taskCount,
-      apiTasks: 'Check /api/tasks (in-memory during dev)',
-      note: 'API uses in-memory for rapid iteration. Solana integration ready for production.',
+      apiTasks: 'Check /api/tasks (hybrid: database + blockchain)',
+      note: 'Tasks stored in Railway PostgreSQL with optional Solana blockchain writes for escrow.',
       deployment: {
         programId: PROGRAM_ID.toBase58(),
         network: NETWORK,

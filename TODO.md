@@ -82,7 +82,9 @@
 | 2026-02-13 | Task 2 | ✅ DONE | Voting added to agents |
 | 2026-02-13 | Task 3 | 📋 SCRIPT READY | Created 2-3 minute demo script |
 | 2026-02-13 | Task 4 | ✅ DONE | Created 5 new chain transactions (6 total) |
+| 2026-02-13 | Task 5 | ✅ DONE | Fixed "in-memory" messaging in API |
 | 2026-02-13 | Task 6 | ✅ DONE | CLI error handling + blockchain status display |
+| 2026-02-13 | Task 9 | ✅ DONE | Fixed README "PostgreSQL" claim |
 
 ---
 

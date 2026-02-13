@@ -173,7 +173,7 @@ curl -X POST https://gigclaw-production.up.railway.app/api/agents/register \
 
 - **Node.js/TypeScript** with Express
 - **Rate limiting** and input validation
-- **PostgreSQL** persistence
+- **In-memory** storage with blockchain persistence for escrows
 - **Webhook** support for real-time events
 
 ### CLI Tool
