@@ -1,5 +1,5 @@
 //! GigClaw - Agent-Native Task Marketplace
-//! 
+//!
 //! A Solana program for autonomous AI agent task coordination with:
 //! - USDC escrow for secure payments
 //! - Reputation system with on-chain tracking
@@ -49,7 +49,7 @@ pub mod gigclaw {
     // ========================================================================
 
     /// Creates a new task posting (metadata only, no escrow)
-    /// 
+    ///
     /// # Instruction Accounts (Stack-Optimized)
     /// - task: New task account (init)
     /// - poster: Signer paying for task creation
@@ -140,7 +140,7 @@ pub mod gigclaw {
     /// Cancels a task and refunds escrow (if initialized)
     pub fn cancel_task(ctx: Context<CancelTask>) -> Result<()> {
         let task = &mut ctx.accounts.task;
-        
+
         require!(task.poster == ctx.accounts.poster.key(), ErrorCode::UnauthorizedPoster);
         require!(task.status == TaskStatus::Posted, ErrorCode::TaskNotCancellable);
 
@@ -194,7 +194,7 @@ pub mod gigclaw {
         require!(task.status == TaskStatus::Posted, ErrorCode::TaskNotOpen);
         require!(task.escrow_initialized, ErrorCode::EscrowNotInitialized);
         require!(clock.unix_timestamp < task.deadline, ErrorCode::TaskExpired);
-        
+
         // Validate bid
         require!(bid_amount > 0 && bid_amount <= task.budget, ErrorCode::InvalidBidAmount);
         require!(bidder.key() != task.poster, ErrorCode::PosterCannotBid);
@@ -208,7 +208,7 @@ pub mod gigclaw {
         let min_reputation = bid_amount
             .checked_div(REPUTATION_STAKE_RATIO)
             .ok_or(ErrorCode::ArithmeticOverflow)?;
-        
+
         require!(
             reputation.completed_tasks >= 1 || reputation.total_earned >= min_reputation,
             ErrorCode::InsufficientReputation
@@ -356,6 +356,159 @@ pub mod gigclaw {
 
         Ok(())
     }
+
+    // ========================================================================
+    // DISPUTE RESOLUTION
+    // ========================================================================
+
+    /// Initiates a dispute for a task
+    pub fn initiate_dispute(
+        ctx: Context<InitiateDispute>,
+        reason: String,
+    ) -> Result<()> {
+        let task = &mut ctx.accounts.task;
+        let clock = Clock::get()?;
+
+        require!(
+            task.status == TaskStatus::InProgress || task.status == TaskStatus::Completed,
+            ErrorCode::InvalidTaskStatusForDispute
+        );
+
+        let initiator = ctx.accounts.initiator.key();
+        require!(
+            initiator == task.poster || Some(initiator) == task.assigned_agent,
+            ErrorCode::UnauthorizedDisputeInitiator
+        );
+
+        require!(!reason.is_empty() && reason.len() <= 500, ErrorCode::InvalidDisputeReason);
+
+        task.status = TaskStatus::Disputed;
+        task.dispute_reason = Some(reason);
+        task.dispute_initiator = Some(initiator);
+        task.dispute_created_at = Some(clock.unix_timestamp);
+
+        emit!(DisputeInitiated {
+            task_id: task.task_id.clone(),
+            initiator,
+            created_at: clock.unix_timestamp,
+        });
+
+        Ok(())
+    }
+
+    /// Resolves a dispute and distributes funds
+    pub fn resolve_dispute(
+        ctx: Context<ResolveDispute>,
+        resolution: DisputeResolution,
+    ) -> Result<()> {
+        let task = &mut ctx.accounts.task;
+        let clock = Clock::get()?;
+
+        require!(task.status == TaskStatus::Disputed, ErrorCode::TaskNotInDispute);
+
+        // Check dispute timeout
+        let dispute_age = clock
+            .unix_timestamp
+            .checked_sub(task.dispute_created_at.unwrap_or(0))
+            .ok_or(ErrorCode::ArithmeticOverflow)?;
+
+        require!(
+            dispute_age <= DISPUTE_RESOLUTION_TIMEOUT,
+            ErrorCode::DisputeTimeoutExpired
+        );
+
+        // Transfer funds based on resolution
+        let seeds = &[
+            b"escrow",
+            task.task_id.as_bytes(),
+            &[task.escrow_bump],
+        ];
+        let signer = &[&seeds[..]];
+
+        match resolution {
+            DisputeResolution::RefundPoster => {
+                // Return full amount to poster
+                let cpi_ctx = CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.escrow_account.to_account_info(),
+                        to: ctx.accounts.poster_token_account.to_account_info(),
+                        authority: ctx.accounts.escrow_authority.to_account_info(),
+                    },
+                    signer,
+                );
+
+                token::transfer(cpi_ctx, task.final_budget)?;
+
+                // Update reputation - penalize agent
+                if let Some(agent) = task.assigned_agent {
+                    let reputation = &mut ctx.accounts.agent_reputation;
+                    reputation.penalize_dispute()?;
+                }
+            }
+            DisputeResolution::PayAgent => {
+                // Release payment to agent
+                let cpi_ctx = CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.escrow_account.to_account_info(),
+                        to: ctx.accounts.agent_token_account.to_account_info(),
+                        authority: ctx.accounts.escrow_authority.to_account_info(),
+                    },
+                    signer,
+                );
+
+                token::transfer(cpi_ctx, task.final_budget)?;
+
+                // Update agent reputation
+                if let Some(agent) = task.assigned_agent {
+                    let reputation = &mut ctx.accounts.agent_reputation;
+                    reputation.complete_task(task.final_budget)?;
+                }
+            }
+            DisputeResolution::SplitPayment => {
+                // Split 50/50
+                let half_amount = task
+                    .final_budget
+                    .checked_div(2)
+                    .ok_or(ErrorCode::ArithmeticOverflow)?;
+
+                // Transfer half to poster
+                let cpi_ctx_poster = CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.escrow_account.to_account_info(),
+                        to: ctx.accounts.poster_token_account.to_account_info(),
+                        authority: ctx.accounts.escrow_authority.to_account_info(),
+                    },
+                    signer,
+                );
+                token::transfer(cpi_ctx_poster, half_amount)?;
+
+                // Transfer half to agent
+                let cpi_ctx_agent = CpiContext::new_with_signer(
+                    ctx.accounts.token_program.to_account_info(),
+                    Transfer {
+                        from: ctx.accounts.escrow_account.to_account_info(),
+                        to: ctx.accounts.agent_token_account.to_account_info(),
+                        authority: ctx.accounts.escrow_authority.to_account_info(),
+                    },
+                    signer,
+                );
+                token::transfer(cpi_ctx_agent, half_amount)?;
+            }
+        }
+
+        task.status = TaskStatus::Resolved;
+
+        emit!(DisputeResolved {
+            task_id: task.task_id.clone(),
+            resolution: resolution as u8,
+            resolved_at: clock.unix_timestamp,
+        });
+
+        Ok(())
+    }
 }
 
 // ============================================================================
@@ -389,13 +542,13 @@ fn validate_task_inputs(
     let max_deadline = current_time
         .checked_add(MAX_TASK_DURATION)
         .ok_or(ErrorCode::ArithmeticOverflow)?;
-    
+
     require!(deadline > current_time, ErrorCode::InvalidDeadline);
     require!(deadline <= max_deadline, ErrorCode::InvalidDeadline);
 
     // Skills validation
     require!(required_skills.len() <= MAX_SKILLS, ErrorCode::TooManySkills);
-    
+
     for skill in required_skills {
         require!(!skill.is_empty(), ErrorCode::InvalidSkill);
         require!(skill.len() <= MAX_SKILL_LENGTH, ErrorCode::InvalidSkill);
@@ -431,7 +584,7 @@ pub struct Task {
 }
 
 impl Task {
-    pub const MAX_SIZE: usize = 
+    pub const MAX_SIZE: usize =
         4 + MAX_TASK_ID_LENGTH +           // task_id
         32 +                                // poster
         4 + MAX_TITLE_LENGTH +              // title
@@ -495,7 +648,7 @@ pub struct Bid {
 }
 
 impl Bid {
-    pub const MAX_SIZE: usize = 
+    pub const MAX_SIZE: usize =
         32 +    // task
         32 +    // bidder
         8 +     // amount
@@ -533,7 +686,7 @@ pub struct Reputation {
 }
 
 impl Reputation {
-    pub const MAX_SIZE: usize = 
+    pub const MAX_SIZE: usize =
         32 +    // agent
         4 +     // completed_tasks
         4 +     // failed_tasks
@@ -557,16 +710,16 @@ impl Reputation {
         self.completed_tasks = self.completed_tasks
             .checked_add(1)
             .ok_or(ErrorCode::ArithmeticOverflow)?;
-        
+
         self.total_earned = self.total_earned
             .checked_add(amount)
             .ok_or(ErrorCode::ArithmeticOverflow)?;
-        
+
         let total = self.completed_tasks
             .checked_add(self.failed_tasks)
             .ok_or(ErrorCode::ArithmeticOverflow)?
             .max(1);
-        
+
         self.success_rate = (self.completed_tasks as u64)
             .checked_mul(100)
             .ok_or(ErrorCode::ArithmeticOverflow)?
@@ -580,9 +733,32 @@ impl Reputation {
         self.rating_sum = self.rating_sum
             .checked_add(rating as u64)
             .ok_or(ErrorCode::ArithmeticOverflow)?;
-        
+
         self.rating_count = self.rating_count
             .checked_add(1)
+            .ok_or(ErrorCode::ArithmeticOverflow)?;
+
+        Ok(())
+    }
+
+    pub fn complete_task(&mut self, amount: u64) -> Result<()> {
+        self.record_completion(amount)
+    }
+
+    pub fn penalize_dispute(&mut self) -> Result<()> {
+        self.failed_tasks = self.failed_tasks
+            .checked_add(1)
+            .ok_or(ErrorCode::ArithmeticOverflow)?;
+
+        let total = self.completed_tasks
+            .checked_add(self.failed_tasks)
+            .ok_or(ErrorCode::ArithmeticOverflow)?
+            .max(1);
+
+        self.success_rate = (self.completed_tasks as u64)
+            .checked_mul(100)
+            .ok_or(ErrorCode::ArithmeticOverflow)?
+            .checked_div(total as u64)
             .ok_or(ErrorCode::ArithmeticOverflow)?;
 
         Ok(())
@@ -600,7 +776,19 @@ pub enum TaskStatus {
     Completed,
     Verified,
     Disputed,
+    Resolved,
     Cancelled,
+}
+
+// ============================================================================
+// DISPUTE RESOLUTION ENUM
+// ============================================================================
+
+#[derive(AnchorSerialize, AnchorDeserialize, Clone, PartialEq, Eq)]
+pub enum DisputeResolution {
+    RefundPoster,  // Full refund to poster (agent at fault)
+    PayAgent,      // Full payment to agent (poster at fault)
+    SplitPayment,  // 50/50 split (mutual fault or unclear)
 }
 
 // ============================================================================
@@ -623,13 +811,13 @@ pub enum ErrorCode {
     TooManySkills,
     #[msg("Invalid skill: must be 1-50 characters")]
     InvalidSkill,
-    
+
     // Escrow
     #[msg("Escrow already initialized")]
     EscrowAlreadyInitialized,
     #[msg("Escrow not initialized")]
     EscrowNotInitialized,
-    
+
     // Bidding
     #[msg("Task is not open for bidding")]
     TaskNotOpen,
@@ -643,7 +831,7 @@ pub enum ErrorCode {
     InvalidDuration,
     #[msg("Insufficient reputation")]
     InsufficientReputation,
-    
+
     // Task state
     #[msg("Task is not in progress")]
     TaskNotInProgress,
@@ -653,7 +841,7 @@ pub enum ErrorCode {
     TaskNotVerified,
     #[msg("Task cannot be cancelled")]
     TaskNotCancellable,
-    
+
     // Auth
     #[msg("Unauthorized: only poster can perform this action")]
     UnauthorizedPoster,
@@ -661,15 +849,27 @@ pub enum ErrorCode {
     UnauthorizedAgent,
     #[msg("Invalid bid")]
     InvalidBid,
-    
+
     // Delivery
     #[msg("Invalid delivery URL")]
     InvalidDeliveryUrl,
-    
+
     // Rating
     #[msg("Invalid rating: must be 1-5")]
     InvalidRating,
-    
+
+    // Dispute
+    #[msg("Invalid task status for dispute")]
+    InvalidTaskStatusForDispute,
+    #[msg("Unauthorized dispute initiator")]
+    UnauthorizedDisputeInitiator,
+    #[msg("Invalid dispute reason")]
+    InvalidDisputeReason,
+    #[msg("Task not in dispute")]
+    TaskNotInDispute,
+    #[msg("Dispute timeout expired")]
+    DisputeTimeoutExpired,
+
     // Math
     #[msg("Arithmetic overflow")]
     ArithmeticOverflow,
@@ -740,6 +940,20 @@ pub struct ReputationInitialized {
     pub agent: Pubkey,
 }
 
+#[event]
+pub struct DisputeInitiated {
+    pub task_id: String,
+    pub initiator: Pubkey,
+    pub created_at: i64,
+}
+
+#[event]
+pub struct DisputeResolved {
+    pub task_id: String,
+    pub resolution: u8,
+    pub resolved_at: i64,
+}
+
 // ============================================================================
 // ACCOUNT STRUCTURES
 // ============================================================================
@@ -755,10 +969,10 @@ pub struct CreateTask<'info> {
         bump
     )]
     pub task: Account<'info, Task>,
-    
+
     #[account(mut)]
     pub poster: Signer<'info>,
-    
+
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }
@@ -770,7 +984,7 @@ pub struct InitializeEscrow<'info> {
         has_one = poster,
     )]
     pub task: Account<'info, Task>,
-    
+
     #[account(
         init,
         payer = poster,
@@ -780,17 +994,17 @@ pub struct InitializeEscrow<'info> {
         token::authority = escrow_account,
     )]
     pub escrow_account: Account<'info, TokenAccount>,
-    
+
     #[account(mut)]
     pub poster: Signer<'info>,
-    
+
     #[account(
         mut,
         constraint = poster_token_account.owner == poster.key(),
         constraint = poster_token_account.mint == usdc_mint.key()
     )]
     pub poster_token_account: Account<'info, TokenAccount>,
-    
+
     pub usdc_mint: Account<'info, token::Mint>,
     pub token_program: Program<'info, Token>,
     pub system_program: Program<'info, System>,
@@ -801,7 +1015,7 @@ pub struct InitializeEscrow<'info> {
 pub struct BidOnTask<'info> {
     #[account(mut)]
     pub task: Account<'info, Task>,
-    
+
     #[account(
         init,
         payer = bidder,
@@ -810,16 +1024,16 @@ pub struct BidOnTask<'info> {
         bump
     )]
     pub bid: Account<'info, Bid>,
-    
+
     #[account(mut)]
     pub bidder: Signer<'info>,
-    
+
     #[account(
         seeds = [b"reputation", bidder.key().as_ref()],
         bump
     )]
     pub bidder_reputation: Account<'info, Reputation>,
-    
+
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
 }
@@ -828,10 +1042,10 @@ pub struct BidOnTask<'info> {
 pub struct AcceptBid<'info> {
     #[account(mut)]
     pub task: Account<'info, Task>,
-    
+
     #[account(mut)]
     pub bid: Account<'info, Bid>,
-    
+
     pub poster: Signer<'info>,
 }
 
@@ -839,17 +1053,17 @@ pub struct AcceptBid<'info> {
 pub struct CancelTask<'info> {
     #[account(mut)]
     pub task: Account<'info, Task>,
-    
+
     #[account(
         mut,
         seeds = [b"escrow", task.task_id.as_bytes()],
         bump = task.escrow_bump,
     )]
     pub escrow_account: Account<'info, TokenAccount>,
-    
+
     #[account(mut)]
     pub poster_token_account: Account<'info, TokenAccount>,
-    
+
     pub poster: Signer<'info>,
     pub token_program: Program<'info, Token>,
 }
@@ -865,24 +1079,24 @@ pub struct CompleteTask<'info> {
 pub struct VerifyAndPay<'info> {
     #[account(mut)]
     pub task: Account<'info, Task>,
-    
+
     #[account(
         mut,
         seeds = [b"escrow", task.task_id.as_bytes()],
         bump = task.escrow_bump,
     )]
     pub escrow_account: Account<'info, TokenAccount>,
-    
+
     #[account(mut)]
     pub agent_token_account: Account<'info, TokenAccount>,
-    
+
     #[account(
         mut,
         seeds = [b"reputation", task.assigned_agent.unwrap().as_ref()],
         bump
     )]
     pub agent_reputation: Account<'info, Reputation>,
-    
+
     pub poster: Signer<'info>,
     pub token_program: Program<'info, Token>,
 }
@@ -891,14 +1105,14 @@ pub struct VerifyAndPay<'info> {
 pub struct RateAgent<'info> {
     #[account(mut)]
     pub task: Account<'info, Task>,
-    
+
     #[account(
         mut,
         seeds = [b"reputation", task.assigned_agent.unwrap().as_ref()],
         bump
     )]
     pub agent_reputation: Account<'info, Reputation>,
-    
+
     pub poster: Signer<'info>,
 }
 
@@ -912,9 +1126,61 @@ pub struct InitializeReputation<'info> {
         bump
     )]
     pub reputation: Account<'info, Reputation>,
-    
+
     #[account(mut)]
     pub agent: Signer<'info>,
     pub system_program: Program<'info, System>,
     pub rent: Sysvar<'info, Rent>,
+}
+
+// ============================================================================
+// DISPUTE ACCOUNT STRUCTURES
+// ============================================================================
+
+#[derive(Accounts)]
+#[instruction(reason: String)]
+pub struct InitiateDispute<'info> {
+    #[account(mut, seeds = [b"task", task.task_id.as_bytes()], bump)]
+    pub task: Account<'info, Task>,
+
+    pub initiator: Signer<'info>,
+}
+
+#[derive(Accounts)]
+#[instruction(resolution: DisputeResolution)]
+pub struct ResolveDispute<'info> {
+    #[account(mut, seeds = [b"task", task.task_id.as_bytes()], bump)]
+    pub task: Account<'info, Task>,
+
+    #[account(
+        mut,
+        seeds = [b"escrow", task.task_id.as_bytes()],
+        bump = task.escrow_bump,
+    )]
+    pub escrow_account: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub poster_token_account: Account<'info, TokenAccount>,
+
+    #[account(mut)]
+    pub agent_token_account: Account<'info, TokenAccount>,
+
+    /// CHECK: PDA that owns the escrow
+    #[account(
+        seeds = [b"escrow", task.task_id.as_bytes()],
+        bump = task.escrow_bump,
+    )]
+    pub escrow_authority: UncheckedAccount<'info>,
+
+    #[account(
+        mut,
+        seeds = [b"reputation", task.assigned_agent.unwrap().as_ref()],
+        bump
+    )]
+    pub agent_reputation: Account<'info, Reputation>,
+
+    /// CHECK: Arbitrator who can resolve disputes
+    pub arbitrator: Signer<'info>,
+
+    pub token_program: Program<'info, Token>,
 }
