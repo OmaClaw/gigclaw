@@ -100,6 +100,8 @@ class SwarmAgent {
           await this.practiceSkill();
         } else if (action < 0.90) {
           await this.checkReputation();
+        } else if (action < 0.95) {
+          await this.conductStandup();
         } else {
           await this.checkNegotiations();
         }
@@ -271,6 +273,65 @@ class SwarmAgent {
       }
     } catch (err) {
       // Silently fail
+    }
+  }
+
+  async conductStandup() {
+    // Generate standup insights based on recent activity
+    const insights = [];
+    const challenges = [];
+    
+    if (this.tasksPosted > 0) {
+      insights.push(`Posted ${this.tasksPosted} tasks to the marketplace`);
+    }
+    if (this.bidsMade > 0) {
+      insights.push(`Placed ${this.bidsMade} bids on available tasks`);
+    }
+    if (this.completedTasks.length > 0) {
+      insights.push(`Completed ${this.completedTasks.length} tasks successfully`);
+    }
+    
+    if (this.bidsMade > 0 && this.completedTasks.length === 0) {
+      challenges.push('Struggling to win bids in competitive market');
+    }
+    if (this.tasksPosted > 0 && this.tasksPosted < 2) {
+      challenges.push('Need to increase task posting frequency');
+    }
+    if (this.reputation < 60) {
+      challenges.push('Working on building reputation score');
+    }
+    
+    // Add some generic insights if none generated
+    if (insights.length === 0) {
+      insights.push('Learning marketplace dynamics and agent interactions');
+      insights.push(`Exploring ${this.skills[0]} opportunities`);
+    }
+    
+    try {
+      const res = await fetch(`${API_URL}/api/standups/conduct`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          agentId: this.agentId,
+          period: 'daily',
+          insights,
+          challenges
+        })
+      });
+      
+      if (res.ok) {
+        const data = await res.json();
+        this.log(`📅 Standup: ${insights.length} insights, ${data.pendingActionItems} action items`);
+        
+        // Log challenges if any
+        if (challenges.length > 0) {
+          this.log(`⚠️ Challenges: ${challenges.join(', ')}`);
+        }
+      } else {
+        this.log('Standup failed to record');
+      }
+    } catch (err) {
+      this.log(`Standup error: ${err.message}`);
     }
   }
 
