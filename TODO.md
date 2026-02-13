@@ -80,6 +80,8 @@
 |------|------|--------|-------|
 | 2026-02-13 | Task 1 | ✅ DONE | Added standup method to swarm agents |
 | 2026-02-13 | Task 2 | ✅ DONE | Voting added to agents |
+| 2026-02-13 | Task 3 | 📋 SCRIPT READY | Created 2-3 minute demo script |
+| 2026-02-13 | Task 4 | IN PROGRESS | Adding more chain transactions |
 
 ---
 
