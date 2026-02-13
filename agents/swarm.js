@@ -100,8 +100,10 @@ class SwarmAgent {
           await this.practiceSkill();
         } else if (action < 0.90) {
           await this.checkReputation();
-        } else if (action < 0.95) {
+        } else if (action < 0.93) {
           await this.conductStandup();
+        } else if (action < 0.96) {
+          await this.checkVoting();
         } else {
           await this.checkNegotiations();
         }
@@ -239,6 +241,94 @@ class SwarmAgent {
           this.log(`📊 Rep: ${this.reputation} → ${data.effectiveReputation} (${data.streakDays}d streak)`);
         }
         this.reputation = data.effectiveReputation;
+      }
+    } catch (err) {
+      // Silently fail
+    }
+  }
+
+  async checkVoting() {
+    try {
+      // Check for active proposals
+      const res = await fetch(`${API_URL}/api/voting/proposals`);
+      if (!res.ok) return;
+
+      const data = await res.json();
+      const activeProposals = data.proposals || [];
+
+      if (activeProposals.length === 0) {
+        // No active proposals, maybe create one occasionally
+        if (Math.random() < 0.3 && this.reputation > 60) {
+          await this.createProposal();
+        }
+        return;
+      }
+
+      // Vote on a random active proposal
+      const proposal = activeProposals[Math.floor(Math.random() * activeProposals.length)];
+      const voteOption = Math.floor(Math.random() * proposal.options.length);
+
+      const voteRes = await fetch(`${API_URL}/api/voting/vote`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          proposalId: proposal.id,
+          agentId: this.agentId,
+          option: voteOption,
+          reputation: this.reputation
+        })
+      });
+
+      if (voteRes.ok) {
+        this.log(`🗳️  Voted on "${proposal.title.slice(0, 30)}..." - Option ${voteOption + 1}`);
+      }
+    } catch (err) {
+      // Silently fail
+    }
+  }
+
+  async createProposal() {
+    const proposalTypes = [
+      {
+        title: 'Increase Task Budget Minimum',
+        description: 'Proposal to increase minimum task budget from 1 USDC to 2 USDC to ensure quality work.',
+        type: 'parameter',
+        options: ['Yes, increase to 2 USDC', 'No, keep at 1 USDC', 'Abstain']
+      },
+      {
+        title: 'New Feature: Skill Endorsements',
+        description: 'Add ability for agents to endorse each other\'s skills after successful collaboration.',
+        type: 'feature',
+        options: ['Support', 'Oppose', 'Needs More Discussion']
+      },
+      {
+        title: 'Treasury Allocation Q1',
+        description: 'Allocate 1000 USDC from treasury for agent onboarding rewards.',
+        type: 'treasury',
+        options: ['Approve', 'Reject', 'Modify Amount']
+      }
+    ];
+
+    const proposal = proposalTypes[Math.floor(Math.random() * proposalTypes.length)];
+
+    try {
+      const res = await fetch(`${API_URL}/api/voting/proposals`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: proposal.title,
+          description: proposal.description,
+          type: proposal.type,
+          proposerId: this.agentId,
+          options: proposal.options,
+          duration: 86400000, // 24 hours
+          minReputation: 40,
+          quorum: 3
+        })
+      });
+
+      if (res.ok) {
+        this.log(`📜 Created proposal: "${proposal.title}"`);
       }
     } catch (err) {
       // Silently fail
