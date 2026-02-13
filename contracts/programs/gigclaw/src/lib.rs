@@ -24,7 +24,8 @@ declare_id!("4CEy2MLsPL5p9BqG2RsBJWoFGczp2WG5yaHGYv7HbCjg");
 pub mod gigclaw {
     use super::*;
 
-    /// Create a new task with comprehensive validation
+    /// Create a new task with comprehensive validation (WITHOUT escrow)
+    /// Call initialize_escrow separately to fund the task
     /// 
     /// # Arguments
     /// * `task_id` - Unique identifier for the task
@@ -106,10 +107,45 @@ pub mod gigclaw {
         task.created_at = current_time;
         task.completed_at = None;
         task.delivery_url = None;
-        task.escrow_bump = ctx.bumps.escrow_account;
+        task.escrow_initialized = false;
+        task.escrow_bump = 0;
         task.dispute_reason = None;
         task.dispute_initiator = None;
         task.dispute_created_at = None;
+
+        emit!(TaskCreated {
+            task_id: task.task_id.clone(),
+            poster: poster.key(),
+            budget,
+            deadline,
+        });
+
+        Ok(())
+    }
+
+    /// Initialize escrow account and transfer funds
+    /// Must be called after create_task and before bidding
+    pub fn initialize_escrow(ctx: Context<InitializeEscrow>) -> Result<()> {
+        let task = &mut ctx.accounts.task;
+        let poster = &ctx.accounts.poster;
+
+        // Validation: Only poster can initialize escrow
+        require!(
+            task.poster == poster.key(),
+            ErrorCode::UnauthorizedPoster
+        );
+
+        // Validation: Escrow not already initialized
+        require!(
+            !task.escrow_initialized,
+            ErrorCode::EscrowAlreadyInitialized
+        );
+
+        // Validation: Task is still in Posted status
+        require!(
+            task.status == TaskStatus::Posted,
+            ErrorCode::TaskNotOpen
+        );
 
         // Transfer budget to escrow
         let transfer_instruction = Transfer {
@@ -123,21 +159,22 @@ pub mod gigclaw {
             transfer_instruction,
         );
 
-        token::transfer(cpi_ctx, budget)?;
+        token::transfer(cpi_ctx, task.budget)?;
 
-        emit!(TaskCreated {
+        // Mark escrow as initialized
+        task.escrow_initialized = true;
+        task.escrow_bump = ctx.bumps.escrow_account;
+
+        emit!(EscrowInitialized {
             task_id: task.task_id.clone(),
-            poster: poster.key(),
-            budget,
-            deadline,
+            escrow: ctx.accounts.escrow_account.key(),
+            amount: task.budget,
         });
 
         Ok(())
     }
 
     /// Bid on a task with reputation staking
-    /// 
-    /// Bidders must stake reputation proportional to their bid
     pub fn bid_on_task(
         ctx: Context<BidOnTask>,
         bid_amount: u64,
@@ -151,6 +188,12 @@ pub mod gigclaw {
         require!(
             task.status == TaskStatus::Posted,
             ErrorCode::TaskNotOpen
+        );
+
+        // Validation: Escrow must be initialized
+        require!(
+            task.escrow_initialized,
+            ErrorCode::EscrowNotInitialized
         );
 
         // Validation: Task must not be expired
@@ -264,35 +307,38 @@ pub mod gigclaw {
             ErrorCode::TaskNotCancellable
         );
 
-        // Refund escrow to poster
-        let transfer_instruction = Transfer {
-            from: ctx.accounts.escrow_account.to_account_info(),
-            to: ctx.accounts.poster_token_account.to_account_info(),
-            authority: ctx.accounts.escrow_account.to_account_info(),
-        };
+        // Only refund if escrow was initialized
+        if task.escrow_initialized {
+            // Refund escrow to poster
+            let transfer_instruction = Transfer {
+                from: ctx.accounts.escrow_account.to_account_info(),
+                to: ctx.accounts.poster_token_account.to_account_info(),
+                authority: ctx.accounts.escrow_account.to_account_info(),
+            };
 
-        let binding = task.task_id.clone();
-        let seeds = &[
-            b"escrow",
-            binding.as_bytes(),
-            &[task.escrow_bump],
-        ];
-        let signer = &[&seeds[..]];
+            let binding = task.task_id.clone();
+            let seeds = &[
+                b"escrow",
+                binding.as_bytes(),
+                &[task.escrow_bump],
+            ];
+            let signer = &[&seeds[..]];
 
-        let cpi_ctx = CpiContext::new_with_signer(
-            ctx.accounts.token_program.to_account_info(),
-            transfer_instruction,
-            signer,
-        );
+            let cpi_ctx = CpiContext::new_with_signer(
+                ctx.accounts.token_program.to_account_info(),
+                transfer_instruction,
+                signer,
+            );
 
-        token::transfer(cpi_ctx, task.budget)?;
+            token::transfer(cpi_ctx, task.budget)?;
+        }
 
         task.status = TaskStatus::Cancelled;
 
         emit!(TaskCancelled {
             task_id: task.task_id.clone(),
             poster: task.poster,
-            refund_amount: task.budget,
+            refund_amount: if task.escrow_initialized { task.budget } else { 0 },
         });
 
         Ok(())
@@ -464,8 +510,6 @@ pub mod gigclaw {
     }
 }
 
-// Account structs and other code continues...
-
 // ============================================================================
 // ACCOUNT STRUCTURES
 // ============================================================================
@@ -482,10 +526,25 @@ pub struct CreateTask<'info> {
     )]
     pub task: Account<'info, Task>,
     
+    #[account(mut)]
+    pub poster: Signer<'info>,
+    
+    pub system_program: Program<'info, System>,
+    pub rent: Sysvar<'info, Rent>,
+}
+
+#[derive(Accounts)]
+pub struct InitializeEscrow<'info> {
+    #[account(
+        mut,
+        has_one = poster,
+    )]
+    pub task: Account<'info, Task>,
+    
     #[account(
         init,
         payer = poster,
-        seeds = [b"escrow", task_id.as_bytes()],
+        seeds = [b"escrow", task.task_id.as_bytes()],
         bump,
         token::mint = usdc_mint,
         token::authority = escrow_account,
@@ -649,6 +708,7 @@ pub struct Task {
     pub created_at: i64,
     pub completed_at: Option<i64>,
     pub delivery_url: Option<String>,
+    pub escrow_initialized: bool,
     pub escrow_bump: u8,
     // Dispute fields
     pub dispute_reason: Option<String>,
@@ -672,6 +732,7 @@ impl Task {
         8 +         // created_at (i64)
         1 + 8 +     // completed_at (Option<i64>: 1 + 8)
         1 + 4 + 200 + // delivery_url (Option<String>: 1 + 4 + 200)
+        1 +         // escrow_initialized (bool)
         1 +         // escrow_bump (u8)
         1 + 4 + 500 + // dispute_reason (Option<String>: 1 + 4 + 500)
         1 + 32 +    // dispute_initiator (Option<Pubkey>: 1 + 32)
@@ -756,6 +817,12 @@ pub enum ErrorCode {
     #[msg("Invalid skill: must be 1-50 characters")]
     InvalidSkill,
     
+    // Escrow errors
+    #[msg("Escrow already initialized")]
+    EscrowAlreadyInitialized,
+    #[msg("Escrow not initialized")]
+    EscrowNotInitialized,
+    
     // Bidding errors
     #[msg("Task is not open for bidding")]
     TaskNotOpen,
@@ -811,6 +878,13 @@ pub struct TaskCreated {
     pub poster: Pubkey,
     pub budget: u64,
     pub deadline: i64,
+}
+
+#[event]
+pub struct EscrowInitialized {
+    pub task_id: String,
+    pub escrow: Pubkey,
+    pub amount: u64,
 }
 
 #[event]
