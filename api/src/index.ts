@@ -17,6 +17,7 @@ import { predictiveRouter } from './routes/predictive';
 import { blockchainRouter } from './routes/blockchain';
 import { healthRouter } from './routes/health';
 import { disputesRouter } from './routes/disputes';
+import { agentDiscoveryRouter } from './routes/agentDiscovery';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput } from './middleware/validation';
 import { startTaskExpiryChecker } from './services/taskExpiry';
@@ -74,6 +75,7 @@ app.use('/api/negotiations', negotiationRouter);
 app.use('/api/predictive', predictiveRouter);
 app.use('/api/blockchain', blockchainRouter);
 app.use('/api/disputes', disputesRouter);
+app.use('/api/agents/discover', agentDiscoveryRouter);
 app.use('/health', healthRouter);
 
 // Root
@@ -85,6 +87,7 @@ app.get('/', (req, res) => {
     endpoints: {
       tasks: '/api/tasks',
       agents: '/api/agents',
+      agentDiscovery: '/api/agents/discover',
       bids: '/api/bids',
       matching: '/api/matching',
       webhooks: '/api/webhooks',
@@ -110,6 +113,7 @@ app.get('/', (req, res) => {
       'Autonomous negotiation',
       'Predictive matching AI',
       'Dispute resolution system',
+      'Agent discovery and search',
       'Self-improvement suggestions',
     ],
     documentation: 'https://raw.githubusercontent.com/OmaClaw/gigclaw/main/skill.md',
