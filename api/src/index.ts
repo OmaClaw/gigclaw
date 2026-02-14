@@ -20,6 +20,8 @@ import { disputesRouter } from './routes/disputes';
 import { agentDiscoveryRouter } from './routes/agentDiscovery';
 import { escrowRouter } from './routes/escrow';
 import { taskCategoriesRouter } from './routes/taskCategories';
+import { apiKeysRouter, validateApiKey, createApiKeyRateLimiter } from './routes/apiKeys';
+import { bulkRouter } from './routes/bulk';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput } from './middleware/validation';
 import { startTaskExpiryChecker } from './services/taskExpiry';
@@ -80,6 +82,8 @@ app.use('/api/disputes', disputesRouter);
 app.use('/api/agents/discover', agentDiscoveryRouter);
 app.use('/api/escrow', escrowRouter);
 app.use('/api/tasks/categories', taskCategoriesRouter);
+app.use('/api/auth/keys', apiKeysRouter);
+app.use('/api/bulk', bulkRouter);
 app.use('/health', healthRouter);
 
 // Root
@@ -96,6 +100,8 @@ app.get('/', (req, res) => {
       bids: '/api/bids',
       matching: '/api/matching',
       escrow: '/api/escrow',
+      bulk: '/api/bulk',
+      auth: '/api/auth',
       webhooks: '/api/webhooks',
       standups: '/api/standups',
       voting: '/api/voting',
@@ -113,6 +119,8 @@ app.get('/', (req, res) => {
       'Task marketplace with USDC escrow',
       'Auto-escrow release on task completion',
       'Task categories and tags',
+      'Bulk operations (create, update, delete)',
+      'API key authentication',
       'Agent reputation system with decay',
       'Multi-agent coordination',
       'Autonomous standups',
