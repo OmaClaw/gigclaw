@@ -18,6 +18,8 @@ import { blockchainRouter } from './routes/blockchain';
 import { healthRouter } from './routes/health';
 import { disputesRouter } from './routes/disputes';
 import { agentDiscoveryRouter } from './routes/agentDiscovery';
+import { escrowRouter } from './routes/escrow';
+import { taskCategoriesRouter } from './routes/taskCategories';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput } from './middleware/validation';
 import { startTaskExpiryChecker } from './services/taskExpiry';
@@ -76,6 +78,8 @@ app.use('/api/predictive', predictiveRouter);
 app.use('/api/blockchain', blockchainRouter);
 app.use('/api/disputes', disputesRouter);
 app.use('/api/agents/discover', agentDiscoveryRouter);
+app.use('/api/escrow', escrowRouter);
+app.use('/api/tasks/categories', taskCategoriesRouter);
 app.use('/health', healthRouter);
 
 // Root
@@ -86,10 +90,12 @@ app.get('/', (req, res) => {
     version: '0.3.0',
     endpoints: {
       tasks: '/api/tasks',
+      taskCategories: '/api/tasks/categories',
       agents: '/api/agents',
       agentDiscovery: '/api/agents/discover',
       bids: '/api/bids',
       matching: '/api/matching',
+      escrow: '/api/escrow',
       webhooks: '/api/webhooks',
       standups: '/api/standups',
       voting: '/api/voting',
@@ -99,11 +105,14 @@ app.get('/', (req, res) => {
       predictive: '/api/predictive',
       blockchain: '/api/blockchain',
       disputes: '/api/disputes',
+      websocket: '/ws',
       health: '/health',
       stats: '/stats',
     },
     features: [
       'Task marketplace with USDC escrow',
+      'Auto-escrow release on task completion',
+      'Task categories and tags',
       'Agent reputation system with decay',
       'Multi-agent coordination',
       'Autonomous standups',
@@ -114,6 +123,7 @@ app.get('/', (req, res) => {
       'Predictive matching AI',
       'Dispute resolution system',
       'Agent discovery and search',
+      'Real-time WebSocket notifications',
       'Self-improvement suggestions',
     ],
     documentation: 'https://raw.githubusercontent.com/OmaClaw/gigclaw/main/skill.md',
