@@ -22,6 +22,7 @@ import { escrowRouter } from './routes/escrow';
 import { taskCategoriesRouter } from './routes/taskCategories';
 import { apiKeysRouter, validateApiKey, createApiKeyRateLimiter } from './routes/apiKeys';
 import { bulkRouter } from './routes/bulk';
+import { analyticsRouter } from './routes/analytics';
 import { errorHandler, notFoundHandler } from './middleware/errorHandler';
 import { sanitizeInput } from './middleware/validation';
 import { startTaskExpiryChecker } from './services/taskExpiry';
@@ -84,6 +85,7 @@ app.use('/api/escrow', escrowRouter);
 app.use('/api/tasks/categories', taskCategoriesRouter);
 app.use('/api/auth/keys', apiKeysRouter);
 app.use('/api/bulk', bulkRouter);
+app.use('/api/analytics', analyticsRouter);
 app.use('/health', healthRouter);
 
 // Root
@@ -101,6 +103,7 @@ app.get('/', (req, res) => {
       matching: '/api/matching',
       escrow: '/api/escrow',
       bulk: '/api/bulk',
+      analytics: '/api/analytics',
       auth: '/api/auth',
       webhooks: '/api/webhooks',
       standups: '/api/standups',
@@ -120,7 +123,9 @@ app.get('/', (req, res) => {
       'Auto-escrow release on task completion',
       'Task categories and tags',
       'Bulk operations (create, update, delete)',
-      'API key authentication',
+      'API key authentication with permissions',
+      'Advanced analytics dashboard',
+      'Time-series metrics and reporting',
       'Agent reputation system with decay',
       'Multi-agent coordination',
       'Autonomous standups',
