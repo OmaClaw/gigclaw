@@ -121,7 +121,7 @@ bulkRouter.post(
         success: true,
       });
 
-      wsService.broadcast('tasks:updates', {
+      wsService.broadcastToChannel('tasks:updates', {
         type: 'status_change',
         taskId: update.taskId,
         oldStatus,
@@ -189,7 +189,7 @@ bulkRouter.post(
         success: true,
       });
 
-      wsService.broadcast('tasks:updates', {
+      wsService.broadcastToChannel('tasks:updates', {
         type: 'deleted',
         taskId,
         reason,
@@ -315,5 +315,3 @@ bulkRouter.get('/stats', (req: Request, res: Response) => {
     note: 'Bulk operation stats tracking coming soon',
   });
 });
-
-export { bulkRouter };

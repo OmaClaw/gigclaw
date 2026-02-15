@@ -125,3 +125,14 @@ export const logAgentAction = (
 ) => {
   logger.info(`Agent ${action}`, { agentId, action, ...details, type: 'agent_action' });
 };
+
+export const logPaymentReleased = (taskId: string, payment: any) => {
+  logger.info('Payment released', {
+    taskId,
+    agentId: payment.agentId,
+    amount: payment.amount,
+    currency: payment.currency,
+    autoReleased: payment.autoReleased,
+    type: 'payment_released'
+  });
+};

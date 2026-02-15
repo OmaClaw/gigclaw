@@ -268,6 +268,11 @@ class WebSocketService {
     });
   }
 
+  // Public method for general channel broadcasting
+  broadcastToChannel(channel: string, message: any): void {
+    this.broadcast(channel, message);
+  }
+
   // Send to specific agent
   sendToAgent(agentId: string, message: any): void {
     this.broadcast(`agent:${agentId}`, message);

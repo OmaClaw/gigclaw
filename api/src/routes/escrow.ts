@@ -110,9 +110,9 @@ escrowRouter.post(
 // Get all active escrows
 // GET /api/escrow/active
 escrowRouter.get('/active', (req: Request, res: Response) => {
-  const activeEscrows = [];
+  const activeEscrows: any[] = [];
 
-  tasks.forEach((task, taskId) => {
+  tasks.forEach((task: any, taskId: string) => {
     if (
       task.status === 'in_progress' ||
       task.status === 'completed' ||

@@ -387,5 +387,3 @@ function countTasksInPeriod(since: number): number {
   return Array.from(tasks.values()).filter((t) => t.createdAt > since
   ).length;
 }
-
-export { analyticsRouter };

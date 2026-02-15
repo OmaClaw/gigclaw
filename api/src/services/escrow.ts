@@ -1,6 +1,6 @@
-import { tasks } from './routes/tasks';
-import logger, { logPaymentReleased } from './utils/logger';
-import { wsService } from './services/websocket';
+import { tasks } from '../routes/tasks';
+import logger, { logPaymentReleased } from '../utils/logger';
+import { wsService } from './websocket';
 
 /**
  * Auto-escrow release service
@@ -268,7 +268,7 @@ export function initializeEscrowService(): void {
 
   // Find verified tasks with unreleased payments
   let pendingCount = 0;
-  tasks.forEach((task, taskId) => {
+  tasks.forEach((task: any, taskId: string) => {
     if (
       task.status === 'verified' &&
       !task.paymentReleased &&

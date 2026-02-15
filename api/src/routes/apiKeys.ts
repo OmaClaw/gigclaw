@@ -133,7 +133,7 @@ export function createApiKeyRateLimiter() {
     },
     keyGenerator: (req: Request) => {
       const keyData = (req as any).apiKey as ApiKey;
-      return keyData?.key || req.ip;
+      return keyData?.key || req.ip || 'unknown';
     },
     handler: (req: Request, res: Response) => {
       const keyData = (req as any).apiKey as ApiKey;
